@@ -2,18 +2,19 @@
 Synthetic online betting data for the Player Value & Retention Engine.
 
 Writes three tables to data/raw/:
-  players.parquet   one row per player: signup details, home market,
-                    source-of-funds flag, plus hidden "truth" columns
-  bets.parquet      one row per bet: time, market, stake, odds, returns
-  deposits.parquet  one row per deposit attempt: amount, success/failed
+  players.parquet    one row per player: signup details, home market,
+                     plus hidden "truth" columns
+  bets.parquet       one row per bet: time, market, stake, odds, returns
+  deposits.parquet   one row per deposit attempt: amount, success/failed
+  sof_checks.parquet one row per source-of-funds check: when it was
+                     triggered, why, and the outcome
 
 Player types (hidden, for validation only):
   casual    bets now and then, small stakes, usually churns quickly
   regular   steady betting on their favourite market. Some are
             "upgraders" whose stakes rise slowly over time for normal
             reasons (e.g. a pay rise) with NO other warning signs
-  vip       stakes big from their very first bets, long lifetime,
-            usually has a verified source of funds
+  vip       stakes big from their very first bets, long lifetime
   at_risk   starts like a small regular (about £1-5 on one market).
             At a hidden "harm onset" day their behaviour changes:
               - stakes jump and keep escalating vs their own baseline
@@ -23,6 +24,12 @@ Player types (hidden, for validation only):
               - longer sessions and more betting days
               - chasing losses (bigger stake straight after a loss)
               - more declined deposits
+
+Source-of-funds checks are TRIGGERED by behaviour, not assigned:
+  - net losses of £10,000+ within any 90 days, or
+  - successful deposits of £30,000+ within any 365 days.
+VIPs usually pass (they genuinely have the money). At-risk players who
+hit the threshold after harm onset often fail or never provide documents.
 
 These behaviours come from what retail safer gambling staff look for.
 The key idea: harm is a CHANGE from a player's own normal, not a big
@@ -84,19 +91,18 @@ class Behaviour:
 class Segment:
     share: float
     lifetime_mean_days: float
-    sof_verified_rate: float     # share with source-of-funds checks done
     normal: Behaviour
     harm: Behaviour | None = None
 
 
 SEGMENTS: dict[str, Segment] = {
-    "casual": Segment(0.55, 60, 0.01,
+    "casual": Segment(0.55, 60,
         Behaviour(0.6, 2, 6, 4.0, 0.85, 0.03, 0.03, 0.03, EXPLORE_NORMAL)),
-    "regular": Segment(0.30, 320, 0.08,
+    "regular": Segment(0.30, 320,
         Behaviour(2.0, 4, 5, 8.0, 0.80, 0.04, 0.04, 0.05, EXPLORE_NORMAL)),
-    "vip": Segment(0.07, 500, 0.85,
+    "vip": Segment(0.07, 500,
         Behaviour(4.0, 8, 4, 80.0, 0.70, 0.06, 0.03, 0.05, EXPLORE_NORMAL)),
-    "at_risk": Segment(0.08, 300, 0.03,
+    "at_risk": Segment(0.08, 300,
         Behaviour(2.0, 4, 5, 3.0, 0.85, 0.04, 0.04, 0.05, EXPLORE_NORMAL),
         Behaviour(4.0, 9, 3, 6.0, 0.35, 0.28, 0.25, 0.60, EXPLORE_HARM)),
 }
@@ -123,7 +129,6 @@ def make_players(n: int, rng: np.random.Generator) -> pd.DataFrame:
     onset = np.where(onset >= alive, -1, onset)       # churned before onset
 
     upgrader = (seg == "regular") & (rng.random(n) < 0.12)
-    sof = rng.random(n) < np.array([SEGMENTS[s].sof_verified_rate for s in seg])
 
     return pd.DataFrame({
         "player_id": np.arange(1, n + 1),
@@ -132,7 +137,6 @@ def make_players(n: int, rng: np.random.Generator) -> pd.DataFrame:
         "region": rng.choice(REGIONS, size=n),
         "acquisition_channel": rng.choice(CHANNELS, size=n, p=[.30, .25, .20, .15, .10]),
         "home_market": rng.choice(HOME_MARKETS, size=n, p=HOME_WEIGHTS),
-        "source_of_funds_verified": sof,
         # hidden truth: never used as model features
         "_true_segment": seg,
         "_upgrader": upgrader,
@@ -271,15 +275,70 @@ def make_deposits(bets: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
     return deps
 
 
+# ==================================================== source-of-funds checks
+SOF_LOSS_90D = 10_000        # £ net loss within any 90 days
+SOF_DEPOSITS_365D = 30_000   # £ successful deposits within any 365 days
+
+# chance of each outcome once a check is requested
+SOF_OUTCOMES = ["verified", "not_provided", "failed"]
+SOF_PROBS_NORMAL = [0.90, 0.06, 0.04]   # people who can afford it
+SOF_PROBS_HARM = [0.25, 0.45, 0.30]     # at-risk players after harm onset
+
+
+def _first_crossing(daily: pd.DataFrame, col: str, window: str, limit: float) -> pd.Series:
+    """First date each player's rolling `window` total of `col` reaches `limit`."""
+    rolled = (daily.set_index("day").groupby("player_id")[col]
+                   .rolling(window).sum().reset_index())
+    hit = rolled[rolled[col] >= limit]
+    return hit.groupby("player_id")["day"].min()
+
+
+def make_sof_checks(players: pd.DataFrame, bets: pd.DataFrame,
+                    deposits: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
+    """One source-of-funds check per player who crosses a threshold."""
+    loss = (bets.assign(day=bets["placed_at"].dt.floor("D"), loss=bets["stake"] - bets["returns"])
+                .groupby(["player_id", "day"], as_index=False)["loss"].sum())
+    deps = (deposits[deposits["status"] == "success"]
+            .assign(day=lambda d: d["requested_at"].dt.floor("D"))
+            .groupby(["player_id", "day"], as_index=False)["amount"].sum())
+
+    by_loss = _first_crossing(loss, "loss", "90D", SOF_LOSS_90D).rename("loss")
+    by_deps = _first_crossing(deps, "amount", "365D", SOF_DEPOSITS_365D).rename("deposits")
+    trig = pd.concat([by_loss, by_deps], axis=1)
+    trig["requested_at"] = trig.min(axis=1) + pd.Timedelta(days=1, hours=9)   # reviewed next morning
+    trig["trigger"] = np.where(trig["loss"].notna() & (trig["loss"] <= trig["deposits"].fillna(trig["loss"])),
+                               "loss_90d", "deposits_365d")
+    trig = trig.reset_index().rename(columns={"index": "player_id"})
+
+    # was the player already in harm when the check was requested?
+    onset = players.set_index("player_id")["_harm_onset_date"]
+    harmed = (trig["requested_at"] >= trig["player_id"].map(onset)).to_numpy()
+    u = rng.random(len(trig))
+    normal = np.searchsorted(np.cumsum(SOF_PROBS_NORMAL), u)
+    harm = np.searchsorted(np.cumsum(SOF_PROBS_HARM), u)
+    outcome = np.array(SOF_OUTCOMES)[np.where(harmed, harm, normal)]
+
+    # verified/failed after documents are reviewed; not_provided after a 30-day deadline
+    days = np.where(outcome == "not_provided", 30, rng.integers(2, 15, len(trig)))
+    trig["outcome"] = outcome
+    trig["resolved_at"] = trig["requested_at"] + pd.to_timedelta(days, unit="D")
+
+    out = trig[["player_id", "requested_at", "trigger", "outcome", "resolved_at"]]
+    out = out.sort_values("requested_at").reset_index(drop=True)
+    out.insert(0, "check_id", np.arange(1, len(out) + 1))
+    return out
+
+
 # ================================================================== main
 def generate(n_players: int, seed: int = 42):
     rng = np.random.default_rng(seed)
     players = make_players(n_players, rng)
     bets = make_bets(players, rng)
     deposits = make_deposits(bets, rng)
+    sof_checks = make_sof_checks(players, bets, deposits, rng)
     players = players.drop(columns=["_signup_day", "_alive_days", "_onset_day"])
     bets = bets.drop(columns=["_chase_prob", "_session_key", "_phase"])
-    return players, bets, deposits
+    return players, bets, deposits, sof_checks
 
 
 def main() -> None:
@@ -289,16 +348,18 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=Path("data/raw"))
     args = ap.parse_args()
 
-    players, bets, deposits = generate(args.players, args.seed)
+    players, bets, deposits, sof_checks = generate(args.players, args.seed)
     args.out.mkdir(parents=True, exist_ok=True)
     players.to_parquet(args.out / "players.parquet", index=False)
     bets.to_parquet(args.out / "bets.parquet", index=False)
     deposits.to_parquet(args.out / "deposits.parquet", index=False)
+    sof_checks.to_parquet(args.out / "sof_checks.parquet", index=False)
 
     ggr = bets["stake"].sum() - bets["returns"].sum()
     print(f"players:  {len(players):>12,}")
     print(f"bets:     {len(bets):>12,}")
     print(f"deposits: {len(deposits):>12,}")
+    print(f"SoF checks:{len(sof_checks):>11,}")
     print(f"turnover: £{bets['stake'].sum():>13,.0f}")
     print(f"GGR:      £{ggr:>13,.0f}  (margin {ggr / bets['stake'].sum():.1%})")
     print(f"saved to {args.out.resolve()}")

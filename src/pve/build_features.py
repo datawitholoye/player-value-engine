@@ -13,7 +13,7 @@ def main() -> None:
     con = duckdb.connect()   # in-memory database: no server needed
 
     # make the raw Parquet files queryable as tables
-    for name in ["players", "bets", "deposits"]:
+    for name in ["players", "bets", "deposits", "sof_checks"]:
         con.execute(f"CREATE VIEW {name} AS SELECT * FROM '{RAW / name}.parquet'")
 
     for path in sorted(SQL.glob("*.sql")):

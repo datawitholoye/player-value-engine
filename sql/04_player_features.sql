@@ -82,6 +82,20 @@ latest_rolling AS (
     FROM rolling_features
     WHERE bet_date <= (SELECT snapshot_date FROM params)
     QUALIFY ROW_NUMBER() OVER (PARTITION BY player_id ORDER BY bet_date DESC) = 1
+),
+sof AS (
+    -- source-of-funds status AS KNOWN ON the snapshot date:
+    -- a check requested later doesn't exist yet, and one still being
+    -- reviewed is "pending" even if it is later verified
+    SELECT
+        c.player_id,
+        CASE
+            WHEN c.requested_at > s.snapshot_date THEN 'none'
+            WHEN c.resolved_at  > s.snapshot_date THEN 'pending'
+            ELSE c.outcome
+        END AS sof_status
+    FROM sof_checks AS c
+    CROSS JOIN params AS s
 )
 SELECT
     p.player_id,
@@ -92,7 +106,7 @@ SELECT
     p.region,
     p.acquisition_channel,
     p.home_market,
-    p.source_of_funds_verified,
+    COALESCE(c.sof_status, 'none')      AS sof_status,
 
     -- value: recency, frequency, monetary
     s.snapshot_date - l.first_bet_date              AS tenure_days,
@@ -134,4 +148,5 @@ CROSS JOIN params AS s
 LEFT JOIN first_30 AS f       ON p.player_id = f.player_id
 LEFT JOIN last_30 AS m        ON p.player_id = m.player_id
 LEFT JOIN last_90 AS n        ON p.player_id = n.player_id
-LEFT JOIN latest_rolling AS r ON p.player_id = r.player_id;
+LEFT JOIN latest_rolling AS r ON p.player_id = r.player_id
+LEFT JOIN sof AS c            ON p.player_id = c.player_id;
