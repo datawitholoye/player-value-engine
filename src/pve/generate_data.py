@@ -1,20 +1,34 @@
 """
-Synthetic betting data generator for the Player Value & Retention Engine.
+Synthetic online betting data for the Player Value & Retention Engine.
 
-Creates three tables that look like a sportsbook/casino operator's raw data:
-  players.parquet   one row per player (signup info + hidden true segment)
-  bets.parquet      one row per bet
-  deposits.parquet  one row per deposit attempt (successful or failed)
+Writes three tables to data/raw/:
+  players.parquet   one row per player: signup details, home market,
+                    source-of-funds flag, plus hidden "truth" columns
+  bets.parquet      one row per bet: time, market, stake, odds, returns
+  deposits.parquet  one row per deposit attempt: amount, success/failed
 
-Players belong to one of four hidden segments. Each segment behaves
-differently, so the models we build later have real patterns to find:
-  casual      bets rarely, small stakes, churns quickly
-  regular     steady weekly betting, medium stakes
-  vip         frequent, high stakes, long lifetime
-  at_risk     stakes ESCALATE over time, more late-night play, more failed
-              deposits (these are the harm markers the guardrail must catch)
+Player types (hidden, for validation only):
+  casual    bets now and then, small stakes, usually churns quickly
+  regular   steady betting on their favourite market. Some are
+            "upgraders" whose stakes rise slowly over time for normal
+            reasons (e.g. a pay rise) with NO other warning signs
+  vip       stakes big from their very first bets, long lifetime,
+            usually has a verified source of funds
+  at_risk   starts like a small regular (about £1-5 on one market).
+            At a hidden "harm onset" day their behaviour changes:
+              - stakes jump and keep escalating vs their own baseline
+              - they spread into markets they never used (virtuals,
+                casino, sports they don't normally follow)
+              - more betting very late at night / very early morning
+              - longer sessions and more betting days
+              - chasing losses (bigger stake straight after a loss)
+              - more declined deposits
 
-The data is SYNTHETIC. Nothing here comes from a real operator.
+These behaviours come from what retail safer gambling staff look for.
+The key idea: harm is a CHANGE from a player's own normal, not a big
+number. A VIP staking £500 is not a red flag; a £2 punter staking £50 is.
+
+All data is SYNTHETIC. Nothing comes from a real operator.
 
 Usage:
     python -m pve.generate_data --players 20000 --out data/raw
@@ -32,134 +46,240 @@ OBS_START = pd.Timestamp("2024-01-01")
 OBS_END = pd.Timestamp("2025-12-31 23:59:59")
 OBS_DAYS = (OBS_END - OBS_START).days + 1
 
+# ---------------------------------------------------------------- markets
+HOME_MARKETS = ["football", "horse_racing", "greyhounds"]
+HOME_WEIGHTS = [0.55, 0.28, 0.17]
+OTHER_SPORTS = ["tennis", "rugby", "ice_hockey", "basketball", "darts"]
+ALL_MARKETS = HOME_MARKETS + OTHER_SPORTS + ["virtuals", "casino"]
+
+# where a bet goes when it is NOT on the player's home market
+EXPLORE_NORMAL = {"football": .30, "horse_racing": .25, "greyhounds": .15,
+                  "tennis": .10, "darts": .08, "rugby": .05, "ice_hockey": .03,
+                  "basketball": .02, "virtuals": .01, "casino": .01}
+EXPLORE_HARM = {"virtuals": .32, "casino": .28, "greyhounds": .08,
+                "horse_racing": .06, "football": .04, "ice_hockey": .06,
+                "rugby": .05, "basketball": .05, "tennis": .04, "darts": .02}
+
+# operator margin by market: share of stakes paid back on average
+PAYBACK = {"football": .93, "tennis": .93, "rugby": .93, "ice_hockey": .93,
+           "basketball": .93, "darts": .93, "horse_racing": .86,
+           "greyhounds": .86, "virtuals": .88, "casino": .95}
+
+
+@dataclass(frozen=True)
+class Behaviour:
+    """How a player behaves in one phase of their life."""
+    active_days_per_week: float
+    bets_per_session: float
+    minutes_between_bets: float
+    stake_median: float          # £, at the start of the phase
+    home_share: float            # share of bets on their home market
+    late_night_share: float      # share of sessions starting 00:00-05:59
+    failed_deposit_rate: float
+    chase_prob: float            # chance of raising stake after a loss
+    explore: dict
+
 
 @dataclass(frozen=True)
 class Segment:
-    share: float              # share of players in this segment
-    active_days_per_week: float
-    bets_per_active_day: float
-    stake_median: float       # £
-    stake_sigma: float        # lognormal spread
-    lifetime_mean_days: float # mean days before churning
-    casino_share: float       # share of bets on casino vs sports
-    late_night_share: float   # share of bets placed 00:00-05:59
-    stake_growth: float       # stake multiplier per 30 days active (1.0 = flat)
-    failed_deposit_rate: float
+    share: float
+    lifetime_mean_days: float
+    sof_verified_rate: float     # share with source-of-funds checks done
+    normal: Behaviour
+    harm: Behaviour | None = None
 
 
 SEGMENTS: dict[str, Segment] = {
-    "casual":  Segment(0.55, 0.6, 2.0,  5.0, 0.8,  60, 0.20, 0.03, 1.00, 0.03),
-    "regular": Segment(0.30, 2.0, 4.0, 10.0, 0.7, 300, 0.30, 0.05, 1.00, 0.04),
-    "vip":     Segment(0.07, 4.5, 9.0, 60.0, 0.9, 500, 0.35, 0.06, 1.00, 0.03),
-    "at_risk": Segment(0.08, 4.0, 8.0, 12.0, 0.9, 260, 0.55, 0.22, 1.18, 0.18),
+    "casual": Segment(0.55, 60, 0.01,
+        Behaviour(0.6, 2, 6, 4.0, 0.85, 0.03, 0.03, 0.03, EXPLORE_NORMAL)),
+    "regular": Segment(0.30, 320, 0.08,
+        Behaviour(2.0, 4, 5, 8.0, 0.80, 0.04, 0.04, 0.05, EXPLORE_NORMAL)),
+    "vip": Segment(0.07, 500, 0.85,
+        Behaviour(4.0, 8, 4, 80.0, 0.70, 0.06, 0.03, 0.05, EXPLORE_NORMAL)),
+    "at_risk": Segment(0.08, 300, 0.03,
+        Behaviour(2.0, 4, 5, 3.0, 0.85, 0.04, 0.04, 0.05, EXPLORE_NORMAL),
+        Behaviour(4.0, 9, 3, 6.0, 0.35, 0.28, 0.25, 0.60, EXPLORE_HARM)),
 }
 
-CHANNELS = ["organic", "paid_search", "affiliate", "social", "retail_crosssell"]
+AGE_BANDS = ["18-24", "25-34", "35-44", "45-54", "55+"]
 REGIONS = ["North East", "North West", "Yorkshire", "Midlands", "London",
            "South East", "South West", "Scotland", "Wales"]
-AGE_BANDS = ["18-24", "25-34", "35-44", "45-54", "55+"]
+CHANNELS = ["organic", "paid_search", "affiliate", "social", "retail_crosssell"]
 
 
+# ================================================================ players
 def make_players(n: int, rng: np.random.Generator) -> pd.DataFrame:
     names = list(SEGMENTS)
     shares = np.array([SEGMENTS[s].share for s in names])
     seg = rng.choice(names, size=n, p=shares / shares.sum())
 
-    # signups spread across the first 20 months so we have room to observe churn
-    signup_offset = rng.integers(0, OBS_DAYS - 120, size=n)
+    signup = rng.integers(0, OBS_DAYS - 120, size=n)
     lifetime = np.array([rng.exponential(SEGMENTS[s].lifetime_mean_days) for s in seg])
     lifetime = np.maximum(lifetime, 1).astype(int)
+    alive = np.minimum(lifetime, OBS_DAYS - signup)   # days visible to us
+
+    # at-risk players change behaviour 3 weeks to 5 months after joining
+    onset = np.where(seg == "at_risk", rng.integers(21, 150, size=n), -1)
+    onset = np.where(onset >= alive, -1, onset)       # churned before onset
+
+    upgrader = (seg == "regular") & (rng.random(n) < 0.12)
+    sof = rng.random(n) < np.array([SEGMENTS[s].sof_verified_rate for s in seg])
 
     return pd.DataFrame({
         "player_id": np.arange(1, n + 1),
-        "signup_date": OBS_START + pd.to_timedelta(signup_offset, unit="D"),
-        "age_band": rng.choice(AGE_BANDS, size=n, p=[0.18, 0.30, 0.22, 0.17, 0.13]),
+        "signup_date": OBS_START + pd.to_timedelta(signup, unit="D"),
+        "age_band": rng.choice(AGE_BANDS, size=n, p=[.18, .30, .22, .17, .13]),
         "region": rng.choice(REGIONS, size=n),
-        "acquisition_channel": rng.choice(CHANNELS, size=n, p=[0.30, 0.25, 0.20, 0.15, 0.10]),
-        "_true_segment": seg,              # hidden: for validation only, never a model feature
-        "_true_lifetime_days": lifetime,   # hidden
-        "_signup_offset": signup_offset,
+        "acquisition_channel": rng.choice(CHANNELS, size=n, p=[.30, .25, .20, .15, .10]),
+        "home_market": rng.choice(HOME_MARKETS, size=n, p=HOME_WEIGHTS),
+        "source_of_funds_verified": sof,
+        # hidden truth: never used as model features
+        "_true_segment": seg,
+        "_upgrader": upgrader,
+        "_harm_onset_date": (OBS_START + pd.to_timedelta(signup + onset, unit="D"))
+                            .where(onset >= 0),
+        "_signup_day": signup,
+        "_alive_days": alive,
+        "_onset_day": onset,
     })
+
+
+# ================================================================== bets
+def _sessions(day0, length, rate, rng):
+    """Pick active days inside [day0, day0+length) for each player.
+    Returns (player_index, day_in_life) for every active day."""
+    n = rng.binomial(np.maximum(length, 0), np.clip(rate, 0, 1))
+    idx = np.repeat(np.arange(len(length)), n)
+    day = np.repeat(day0, n) + (rng.random(len(idx)) * np.repeat(length, n)).astype(int)
+    return idx, day
+
+
+def _phase_bets(p: pd.DataFrame, b: Behaviour, day0, length, harm: bool,
+                rng: np.random.Generator) -> pd.DataFrame:
+    """All bets for players `p` during one phase of their life."""
+    personal = rng.lognormal(0, 0.35, len(p))           # people differ
+    idx, life_day = _sessions(day0, length, b.active_days_per_week / 7 * personal, rng)
+    if len(idx) == 0:
+        return pd.DataFrame()
+
+    # each active day = one session of several bets a few minutes apart
+    n_bets = rng.poisson(b.bets_per_session * np.sqrt(personal[idx])) + 1
+    sess_start_hour = np.where(rng.random(len(idx)) < b.late_night_share,
+                               rng.integers(0, 6, len(idx)),
+                               rng.choice(np.arange(8, 24), len(idx)))
+    session_id = np.repeat(np.arange(len(idx)), n_bets)
+    bi = np.repeat(idx, n_bets)                          # player index per bet
+    gaps = rng.exponential(b.minutes_between_bets, len(bi))
+    first = np.r_[0, np.cumsum(n_bets)[:-1]]
+    gaps[first] = 0
+    csum = np.cumsum(gaps)
+    minutes = csum - np.repeat(csum[first], n_bets)      # minutes into session
+
+    day_abs = p["_signup_day"].to_numpy()[bi] + np.repeat(life_day, n_bets)
+    placed = (OBS_START + pd.to_timedelta(day_abs, unit="D")
+              + pd.to_timedelta(np.repeat(sess_start_hour, n_bets) * 60 + minutes, unit="min")
+              + pd.to_timedelta(rng.integers(0, 60, len(bi)), unit="s"))
+
+    # market: mostly home market, sometimes exploring elsewhere
+    home = p["home_market"].to_numpy()[bi]
+    ex_m, ex_p = list(b.explore), np.array(list(b.explore.values()))
+    market = np.where(rng.random(len(bi)) < b.home_share, home,
+                      rng.choice(ex_m, len(bi), p=ex_p / ex_p.sum()))
+
+    # stake: lognormal around the phase median, scaled per player
+    stake = rng.lognormal(np.log(b.stake_median), 0.6, len(bi)) * personal[bi]
+    day_in_life = np.repeat(life_day, n_bets)
+    if harm:   # keeps escalating after onset, capped at 10x
+        since = day_in_life - day0[bi]
+        stake *= np.minimum(1.015 ** since, 10)
+    upg = p["_upgrader"].to_numpy()[bi]                   # slow, healthy growth
+    stake *= np.where(upg, 1 + 0.6 * day_in_life / 365, 1)
+
+    return pd.DataFrame({
+        "player_id": p["player_id"].to_numpy()[bi],
+        "placed_at": placed,
+        "market": market,
+        "stake": stake,
+        "_chase_prob": b.chase_prob,
+        "_session_key": session_id,
+        "_phase": "harm" if harm else "normal",
+    })
+
+
+def _odds(market, rng):
+    n = len(market)
+    sports = np.round(1.2 + rng.gamma(1.6, 0.9, n), 2)
+    racing = np.round(1.5 + rng.gamma(1.4, 3.5, n), 2)
+    casino = rng.choice([2.0, 3.0, 36.0], n, p=[.6, .3, .1])
+    return np.select([np.isin(market, ["horse_racing", "greyhounds", "virtuals"]),
+                      market == "casino"], [racing, casino], sports)
 
 
 def make_bets(players: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
     frames = []
     for name, cfg in SEGMENTS.items():
-        p = players[players["_true_segment"] == name]
+        p = players[players["_true_segment"] == name].reset_index(drop=True)
         if p.empty:
             continue
-        # how many days each player is "alive" inside the observation window
-        alive = np.minimum(p["_true_lifetime_days"].to_numpy(),
-                           OBS_DAYS - p["_signup_offset"].to_numpy())
-        # per-player activity varies around the segment average
-        rate = cfg.active_days_per_week / 7 * rng.lognormal(0, 0.35, len(p))
-        n_active = rng.binomial(alive, np.clip(rate, 0, 1))
-        n_active = np.maximum(n_active, 1)
+        alive, onset = p["_alive_days"].to_numpy(), p["_onset_day"].to_numpy()
+        normal_len = np.where(onset >= 0, onset, alive)
+        frames.append(_phase_bets(p, cfg.normal, np.zeros(len(p), int), normal_len, False, rng))
+        if cfg.harm is not None:
+            has = onset >= 0
+            q = p[has].reset_index(drop=True)
+            frames.append(_phase_bets(q, cfg.harm, onset[has], alive[has] - onset[has], True, rng))
 
-        pid = np.repeat(p["player_id"].to_numpy(), n_active)
-        start = np.repeat(p["_signup_offset"].to_numpy(), n_active)
-        span = np.repeat(alive, n_active)
-        day_in_life = (rng.random(len(pid)) * span).astype(int)
-
-        bets_today = rng.poisson(cfg.bets_per_active_day, len(pid)) + 1
-        pid = np.repeat(pid, bets_today)
-        day_abs = np.repeat(start + day_in_life, bets_today)
-        life_day = np.repeat(day_in_life, bets_today)
-
-        # time of day: daytime/evening mostly, late night for some
-        late = rng.random(len(pid)) < cfg.late_night_share
-        hour = np.where(late, rng.integers(0, 6, len(pid)),
-                        rng.choice(np.arange(6, 24), len(pid)))
-        secs = rng.integers(0, 3600, len(pid))
-
-        growth = cfg.stake_growth ** (life_day / 30)
-        stake = rng.lognormal(np.log(cfg.stake_median), cfg.stake_sigma, len(pid)) * growth
-        stake = np.round(np.clip(stake, 0.10, 25_000), 2)
-
-        casino = rng.random(len(pid)) < cfg.casino_share
-        # sports odds (decimal) vs casino "odds" (~ house edge baked in)
-        odds = np.where(casino, rng.choice([2.0, 3.0, 36.0], len(pid), p=[.6, .3, .1]),
-                        np.round(1 + rng.gamma(1.6, 0.9, len(pid)), 2))
-        margin = np.where(casino, 0.95, 0.93)   # operator edge
-        win = rng.random(len(pid)) < (margin / odds)
-        returns = np.round(np.where(win, stake * odds, 0.0), 2)
-
-        frames.append(pd.DataFrame({
-            "player_id": pid,
-            "placed_at": OBS_START + pd.to_timedelta(day_abs, unit="D")
-                         + pd.to_timedelta(hour * 3600 + secs, unit="s"),
-            "product": np.where(casino, "casino", "sports"),
-            "stake": stake,
-            "odds": odds,
-            "returns": returns,
-        }))
     bets = pd.concat(frames, ignore_index=True)
-    bets = bets[bets["placed_at"] <= OBS_END].sort_values("placed_at", kind="stable")
+    bets = bets[bets["placed_at"] <= OBS_END]
+    bets = bets.sort_values(["player_id", "placed_at"], kind="stable").reset_index(drop=True)
+
+    # outcome first (depends only on odds), then chasing: a bigger stake
+    # straight after a lost bet, for players prone to chasing
+    bets["odds"] = _odds(bets["market"].to_numpy(), rng)
+    payback = bets["market"].map(PAYBACK).to_numpy()
+    won = rng.random(len(bets)) < payback / bets["odds"].to_numpy()
+    prev_lost = np.r_[False, ~won[:-1]] & np.r_[False, bets["player_id"].to_numpy()[1:]
+                                                 == bets["player_id"].to_numpy()[:-1]]
+    chase = prev_lost & (rng.random(len(bets)) < bets["_chase_prob"].to_numpy())
+    stake = bets["stake"].to_numpy() * np.where(chase, rng.uniform(1.5, 3.0, len(bets)), 1)
+    bets["stake"] = np.round(np.clip(stake, 0.10, 25_000), 2)
+    bets["returns"] = np.round(np.where(won, bets["stake"] * bets["odds"], 0.0), 2)
+    bets["outcome"] = np.where(won, "won", "lost")
+
+    bets = bets.sort_values("placed_at", kind="stable").reset_index(drop=True)
     bets.insert(0, "bet_id", np.arange(1, len(bets) + 1))
-    bets["outcome"] = np.where(bets["returns"] > 0, "won", "lost")
-    return bets.reset_index(drop=True)
+    return bets
 
 
-def make_deposits(players: pd.DataFrame, bets: pd.DataFrame,
-                  rng: np.random.Generator) -> pd.DataFrame:
-    # one deposit attempt per player per betting day, sized to cover that day's stakes
-    daily = (bets.assign(day=bets["placed_at"].dt.floor("D"))
-                 .groupby(["player_id", "day"], as_index=False)
-                 .agg(staked=("stake", "sum"), first_bet=("placed_at", "min")))
-    seg = players.set_index("player_id")["_true_segment"]
-    fail_rate = daily["player_id"].map(seg).map(lambda s: SEGMENTS[s].failed_deposit_rate)
-    failed = rng.random(len(daily)) < fail_rate.to_numpy()
+# ============================================================== deposits
+def make_deposits(bets: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
+    """One deposit attempt before each session, sized to roughly cover it.
+    A failed attempt is followed by a retry a few minutes later."""
+    sess = (bets.groupby(["player_id", "_phase", "_session_key"], as_index=False)
+                .agg(staked=("stake", "sum"), start=("placed_at", "min")))
+    fail_rate = np.where(sess["_phase"] == "harm", 0.25, 0.035)
+    failed = rng.random(len(sess)) < fail_rate
+    amount = np.maximum(np.round(np.ceil(sess["staked"] * rng.uniform(.5, 1.1, len(sess)) / 5) * 5), 5)
+    t0 = sess["start"] - pd.to_timedelta(rng.integers(2, 20, len(sess)), unit="min")
 
-    amount = np.round(np.ceil(daily["staked"] * rng.uniform(0.6, 1.2, len(daily)) / 5) * 5, 2)
-    deps = pd.DataFrame({
-        "player_id": daily["player_id"],
-        "requested_at": daily["first_bet"] - pd.to_timedelta(rng.integers(60, 1800, len(daily)), unit="s"),
-        "amount": np.maximum(amount, 5),
-        "status": np.where(failed, "failed", "success"),
-    })
-    deps = deps.sort_values("requested_at", kind="stable").reset_index(drop=True)
+    attempt = pd.DataFrame({"player_id": sess["player_id"], "requested_at": t0,
+                            "amount": amount, "status": np.where(failed, "failed", "success")})
+    retry = attempt[failed].assign(requested_at=lambda d: d["requested_at"] + pd.Timedelta(minutes=1),
+                                   status="success")
+    deps = pd.concat([attempt, retry]).sort_values("requested_at", kind="stable").reset_index(drop=True)
     deps.insert(0, "deposit_id", np.arange(1, len(deps) + 1))
     return deps
+
+
+# ================================================================== main
+def generate(n_players: int, seed: int = 42):
+    rng = np.random.default_rng(seed)
+    players = make_players(n_players, rng)
+    bets = make_bets(players, rng)
+    deposits = make_deposits(bets, rng)
+    players = players.drop(columns=["_signup_day", "_alive_days", "_onset_day"])
+    bets = bets.drop(columns=["_chase_prob", "_session_key", "_phase"])
+    return players, bets, deposits
 
 
 def main() -> None:
@@ -169,14 +289,9 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=Path("data/raw"))
     args = ap.parse_args()
 
-    rng = np.random.default_rng(args.seed)
+    players, bets, deposits = generate(args.players, args.seed)
     args.out.mkdir(parents=True, exist_ok=True)
-
-    players = make_players(args.players, rng)
-    bets = make_bets(players, rng)
-    deposits = make_deposits(players, bets, rng)
-
-    players.drop(columns=["_signup_offset"]).to_parquet(args.out / "players.parquet", index=False)
+    players.to_parquet(args.out / "players.parquet", index=False)
     bets.to_parquet(args.out / "bets.parquet", index=False)
     deposits.to_parquet(args.out / "deposits.parquet", index=False)
 

@@ -12,3 +12,4 @@ __pycache__/
 # editors / OS
 .vscode/
 .DS_Store
+*.egg-info/

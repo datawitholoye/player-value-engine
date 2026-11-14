@@ -1,9 +1,0 @@
-README.md
-pyproject.toml
-src/pve/__init__.py
-src/pve/generate_data.py
-src/pve.egg-info/PKG-INFO
-src/pve.egg-info/SOURCES.txt
-src/pve.egg-info/dependency_links.txt
-src/pve.egg-info/top_level.txt
-tests/test_generate_data.py
