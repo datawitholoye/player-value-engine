@@ -1,0 +1,14 @@
+# data is generated, never committed
+data/
+*.parquet
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# editors / OS
+.vscode/
+.DS_Store
