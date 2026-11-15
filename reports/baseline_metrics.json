@@ -1,0 +1,56 @@
+{
+  "players": {
+    "current": 7098,
+    "train": 4968,
+    "test": 2130
+  },
+  "clv": {
+    "bgnbd_params": {
+      "r": 2.4697,
+      "alpha": 10.0937,
+      "a": 0.2204,
+      "b": 24.1959
+    },
+    "gamma_gamma_params": {
+      "p": 0.7468,
+      "q": 0.8998,
+      "v": 51.4304
+    },
+    "gamma_gamma_checks": {
+      "q_above_1": false,
+      "frequency_spend_correlation": 0.661,
+      "used": false,
+      "fallback": "each player's observed average stake per betting day"
+    },
+    "house_margin": 0.1017,
+    "betting_days": {
+      "predicted_total": 72096,
+      "actual_total": 55355,
+      "spearman": 0.81
+    },
+    "value": {
+      "spearman_clv_model": 0.553,
+      "spearman_naive": 0.297,
+      "top_decile_capture_clv_model": 0.699,
+      "top_decile_capture_naive": 0.602
+    }
+  },
+  "churn": {
+    "churn_rate_test": 0.338,
+    "roc_auc": {
+      "logistic_regression": 0.959,
+      "bgnbd_activity": 0.946,
+      "days_since_last_bet": 0.957
+    },
+    "pr_auc": {
+      "logistic_regression": 0.937,
+      "bgnbd_activity": 0.934,
+      "days_since_last_bet": 0.941
+    },
+    "n_features": 29
+  },
+  "harm_exposure_without_guardrail": {
+    "share_of_all_current_players_in_harm": 0.079,
+    "share_of_top_decile_targets_in_harm": 0.16
+  }
+}

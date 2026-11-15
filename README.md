@@ -2,7 +2,7 @@
 
 Predicts each player's future value and churn risk for a betting operator, and **blocks retention offers to players showing signs of gambling harm**.
 
-> Status: in progress. Data generator and SQL feature layer done; value and churn models next.
+> Status: in progress. Data, SQL features and baseline models done; LightGBM models and the safer gambling guardrail next.
 
 ## Why this project
 
@@ -43,10 +43,36 @@ The features are built in SQL, one step per file, run in order by `src/pve/build
 | `02_rolling_features.sql` | ~700k player-days | Last 7 days vs the player's previous 30 days: stake jump, late-night share, failed deposits | window functions, `RANGE` intervals, `LAG` |
 | `03_bet_patterns.sql` | ~700k player-days | Chasing losses, bets on unfamiliar markets, session lengths | `LAG` on bets, sessionisation (gaps and islands) |
 | `04_player_features.sql` | ~16k players | One row per player at a snapshot date: value (RFM), recent behaviour, change vs their first month, source-of-funds status as known on that date | `QUALIFY`, `ROW_NUMBER`, `NTILE` |
+| `05_labels.sql` | ~16k players | What actually happened after the snapshot: betting days, stake and net loss over the next 6 months, and churn (no bet within 90 days) | date arithmetic, `LEFT JOIN` + `COALESCE` |
 
 Features only use data **up to the snapshot date (30 June 2025)**. What happens afterwards becomes the label for the models, so no future information leaks into training.
 
 **What the features show:** at the snapshot, players already in harm stake a median **14x** their first-month average (everyone else: about 1x; healthy "upgraders": 1.2x), and **47%** of their recent bets are on markets they never used in their first month (everyone else: under 3%). They also sit in value decile 8.2 on average, so a value model with no guardrail would prioritise them for offers.
+
+## Baseline models
+
+Simple, explainable benchmarks that later models must beat (`python -m pve.train_baselines`, results in `reports/baseline_metrics.json`). Scored on the 7,098 players active in the 90 days before the snapshot, with a 70/30 train/test split.
+
+**Value (next 6 months)**: BG/NBD predicts each player's future betting days; spend per day and the house margin turn that into value. BG/NBD and Gamma-Gamma are implemented from the original papers in `src/pve/clv.py` (the `lifetimes` library no longer works with current pandas) and tested by recovering known parameters from simulated players.
+
+| Model | Rank correlation with actual value | Share of future value in top 10% |
+|---|---|---|
+| Naive: last 90 days repeat | 0.30 | 60% |
+| BG/NBD x spend per day x margin | **0.55** | **70%** |
+
+Gamma-Gamma was fitted but **not used**: its assumptions fail on betting data. Spend per day has a very heavy tail (q = 0.90, so the "average player" isn't defined), and players who bet more often also bet more per day (correlation 0.66), which the model assumes can't happen. The baseline checks both and falls back to each player's own history.
+
+**Churn (no bet in the next 90 days, 34% of players)**
+
+| Model | ROC-AUC |
+|---|---|
+| BG/NBD activity forecast | 0.947 |
+| Rule: days since last bet | 0.959 |
+| Logistic regression, 29 features | 0.960 |
+
+A one-line recency rule is almost as good as logistic regression, so any more complex churn model has to justify itself against it.
+
+**Why the guardrail is needed:** 7.9% of current players are in harm, but **16% of the top 10% by predicted value** are. Targeting offers by value alone doubles the share of harmed players who receive them.
 
 ## Quick start
 
@@ -57,6 +83,7 @@ pip install -r requirements.txt
 pip install -e .
 python -m pve.generate_data      # writes data/raw/*.parquet
 python -m pve.build_features     # runs sql/ and writes data/features/*.parquet
+python -m pve.train_baselines    # fits baseline models, writes reports/baseline_metrics.json
 python -m pytest -q              # all tests should pass
 ```
 
@@ -66,7 +93,7 @@ python -m pytest -q              # all tests should pass
 - [x] Synthetic bet-level data generator
 - [x] Harm markers based on retail safer gambling signals
 - [x] SQL feature layer (DuckDB, window functions)
-- [ ] BG/NBD + Gamma-Gamma CLV baseline, churn baseline
+- [x] BG/NBD + Gamma-Gamma CLV baseline, churn baseline
 - [ ] LightGBM value and churn models with SHAP
 - [ ] Safer gambling guardrail on targeting
 - [ ] PySpark feature pipeline
@@ -75,4 +102,4 @@ python -m pytest -q              # all tests should pass
 
 ## Stack
 
-Python, pandas, NumPy, DuckDB/SQL, PySpark, lifetimes, LightGBM, SHAP, FastAPI, Docker, GitHub Actions, Evidently.
+Python, pandas, NumPy, SciPy, scikit-learn, DuckDB/SQL, PySpark, LightGBM, SHAP, FastAPI, Docker, GitHub Actions, Evidently.
