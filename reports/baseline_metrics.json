@@ -1,56 +1,56 @@
 {
   "players": {
-    "current": 7098,
-    "train": 4968,
-    "test": 2130
+    "current": 6940,
+    "train": 4858,
+    "test": 2082
   },
   "clv": {
     "bgnbd_params": {
-      "r": 2.4697,
-      "alpha": 10.0937,
-      "a": 0.2204,
-      "b": 24.1959
+      "r": 2.4419,
+      "alpha": 10.2891,
+      "a": 0.3171,
+      "b": 38.8317
     },
     "gamma_gamma_params": {
-      "p": 0.7468,
-      "q": 0.8998,
-      "v": 51.4304
+      "p": 0.7213,
+      "q": 0.9748,
+      "v": 55.7546
     },
     "gamma_gamma_checks": {
       "q_above_1": false,
-      "frequency_spend_correlation": 0.661,
+      "frequency_spend_correlation": 0.627,
       "used": false,
       "fallback": "each player's observed average stake per betting day"
     },
-    "house_margin": 0.1017,
+    "house_margin": 0.1036,
     "betting_days": {
-      "predicted_total": 72096,
-      "actual_total": 55355,
+      "predicted_total": 66864,
+      "actual_total": 49907,
       "spearman": 0.81
     },
     "value": {
-      "spearman_clv_model": 0.553,
-      "spearman_naive": 0.297,
-      "top_decile_capture_clv_model": 0.699,
-      "top_decile_capture_naive": 0.602
+      "spearman_clv_model": 0.529,
+      "spearman_naive": 0.26,
+      "top_decile_capture_clv_model": 0.76,
+      "top_decile_capture_naive": 0.677
     }
   },
   "churn": {
-    "churn_rate_test": 0.338,
+    "churn_rate_test": 0.35,
     "roc_auc": {
       "logistic_regression": 0.959,
-      "bgnbd_activity": 0.946,
-      "days_since_last_bet": 0.957
+      "bgnbd_activity": 0.939,
+      "days_since_last_bet": 0.956
     },
     "pr_auc": {
-      "logistic_regression": 0.937,
-      "bgnbd_activity": 0.934,
-      "days_since_last_bet": 0.941
+      "logistic_regression": 0.948,
+      "bgnbd_activity": 0.93,
+      "days_since_last_bet": 0.943
     },
     "n_features": 29
   },
   "harm_exposure_without_guardrail": {
-    "share_of_all_current_players_in_harm": 0.079,
-    "share_of_top_decile_targets_in_harm": 0.16
+    "share_of_all_current_players_in_harm": 0.073,
+    "share_of_top_decile_targets_in_harm": 0.087
   }
 }

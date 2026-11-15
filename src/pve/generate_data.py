@@ -30,6 +30,8 @@ Source-of-funds checks are TRIGGERED by behaviour, not assigned:
   - successful deposits of £30,000+ within any 365 days.
 VIPs usually pass (they genuinely have the money). At-risk players who
 hit the threshold after harm onset often fail or never provide documents.
+A failed or not-provided check SUSPENDS the account: no more bets or
+deposits from the moment it is resolved.
 
 These behaviours come from what retail safer gambling staff look for.
 The key idea: harm is a CHANGE from a player's own normal, not a big
@@ -329,6 +331,25 @@ def make_sof_checks(players: pd.DataFrame, bets: pd.DataFrame,
     return out
 
 
+def apply_sof_suspensions(bets: pd.DataFrame, deposits: pd.DataFrame,
+                          sof_checks: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Business rule: a failed or not-provided source-of-funds check means
+    no more betting until documents are provided. In this data they never
+    are, so everything after the check is resolved is removed."""
+    blocked = sof_checks[sof_checks["outcome"].isin(["failed", "not_provided"])]
+    stop = blocked.set_index("player_id")["resolved_at"]
+
+    def keep(df: pd.DataFrame, time_col: str) -> pd.DataFrame:
+        cutoff = df["player_id"].map(stop)
+        return df[cutoff.isna() | (df[time_col] < cutoff)].reset_index(drop=True)
+
+    bets = keep(bets, "placed_at")
+    bets["bet_id"] = np.arange(1, len(bets) + 1)
+    deposits = keep(deposits, "requested_at")
+    deposits["deposit_id"] = np.arange(1, len(deposits) + 1)
+    return bets, deposits
+
+
 # ================================================================== main
 def generate(n_players: int, seed: int = 42):
     rng = np.random.default_rng(seed)
@@ -336,6 +357,7 @@ def generate(n_players: int, seed: int = 42):
     bets = make_bets(players, rng)
     deposits = make_deposits(bets, rng)
     sof_checks = make_sof_checks(players, bets, deposits, rng)
+    bets, deposits = apply_sof_suspensions(bets, deposits, sof_checks)
     players = players.drop(columns=["_signup_day", "_alive_days", "_onset_day"])
     bets = bets.drop(columns=["_chase_prob", "_session_key", "_phase"])
     return players, bets, deposits, sof_checks

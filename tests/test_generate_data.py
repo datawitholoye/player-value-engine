@@ -112,3 +112,14 @@ def test_at_risk_behaviour_changes_after_onset(data):
     d_after = d["requested_at"] >= d["_harm_onset_date"]
     fail = d["status"] == "failed"
     assert fail[d_after].mean() > 3 * fail[~d_after].mean()
+
+
+def test_no_betting_after_failed_or_missing_source_of_funds(data):
+    # Business rule: a failed or not-provided check suspends the account,
+    # so no bets or deposits may appear after it was resolved.
+    _, bets, deposits, sof = data
+    blocked = sof[sof["outcome"].isin(["failed", "not_provided"])]
+    assert len(blocked) > 0
+    for df, col in [(bets, "placed_at"), (deposits, "requested_at")]:
+        m = df.merge(blocked[["player_id", "resolved_at"]], on="player_id")
+        assert (m[col] < m["resolved_at"]).all()

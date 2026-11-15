@@ -1,0 +1,124 @@
+{
+  "players": {
+    "train": 4858,
+    "test": 2082
+  },
+  "churn": {
+    "roc_auc_lightgbm": 0.96,
+    "pr_auc_lightgbm": 0.949,
+    "roc_auc_best_baseline": 0.959
+  },
+  "value": {
+    "spearman_lightgbm": 0.535,
+    "top_decile_capture_lightgbm": 0.751,
+    "spearman_baseline": 0.529,
+    "top_decile_capture_baseline": 0.76
+  },
+  "harm": {
+    "harmed_players_in_test": 153,
+    "model_amber_threshold": 0.8745,
+    "rules_only": {
+      "roc_auc": 0.794,
+      "harmed_caught": 0.778,
+      "harmed_caught_red": 0.523,
+      "precision_of_flags": 0.578,
+      "red_precision": 0.976,
+      "players_flagged": 206,
+      "share_flagged_by_group": {
+        "at_risk": 0.015,
+        "at_risk_in_harm": 0.778,
+        "casual": 0.056,
+        "regular": 0.044,
+        "vip": 0.033
+      },
+      "median_days_since_onset_caught": 120.0,
+      "median_days_since_onset_missed": 168.5
+    },
+    "model_plus_rules": {
+      "roc_auc": 0.998,
+      "harmed_caught": 0.889,
+      "harmed_caught_red": 0.569,
+      "precision_of_flags": 0.965,
+      "red_precision": 1.0,
+      "players_flagged": 141,
+      "share_flagged_by_group": {
+        "at_risk": 0.0,
+        "at_risk_in_harm": 0.889,
+        "casual": 0.0,
+        "regular": 0.0,
+        "vip": 0.018
+      },
+      "median_days_since_onset_caught": 139.0,
+      "median_days_since_onset_missed": 151.0
+    }
+  },
+  "offers": {
+    "offers_sent": 208,
+    "harmed_share_without_guardrail": 0.183,
+    "harmed_share_with_guardrail": 0.005,
+    "harmed_players_offered_without_guardrail": 38,
+    "harmed_players_offered_with_guardrail": 1,
+    "future_value_targeted_without_guardrail": 2379884,
+    "future_value_targeted_with_guardrail": 2086899
+  },
+  "harm_top_features": {
+    "stake_vs_first30": 1.1151,
+    "stake_90d": 1.0348,
+    "total_bets": 0.7571,
+    "unfamiliar_share_30d": 0.6313,
+    "avg_stake_per_bet": 0.6223,
+    "latest_failed_deposits_7d": 0.3389,
+    "latest_stake_jump_ratio": 0.3157,
+    "late_share_30d": 0.2532,
+    "bets_30d": 0.2233,
+    "chase_rate_30d": 0.2179
+  },
+  "red_flag_examples": [
+    {
+      "player_id": 7978,
+      "p_harm": 1.0,
+      "top_reasons": [
+        "stake_vs_first30 = 25.80",
+        "stake_90d = 68667.31",
+        "unfamiliar_share_30d = 0.35"
+      ],
+      "retail_rules_triggered": [
+        "stake_vs_first30 = 25.80 (threshold 3.0)",
+        "unfamiliar_share_30d = 0.35 (threshold 0.2)",
+        "late_share_vs_first30 = 0.43 (threshold 0.1)",
+        "failed_deposits_30d = 6.00 (threshold 3)",
+        "chase_rate_30d = 0.31 (threshold 0.3)",
+        "session_vs_first30 = 3.15 (threshold 1.5)"
+      ]
+    },
+    {
+      "player_id": 13041,
+      "p_harm": 1.0,
+      "top_reasons": [
+        "stake_vs_first30 = 47.27",
+        "unfamiliar_share_30d = 0.55",
+        "stake_90d = 46284.82"
+      ],
+      "retail_rules_triggered": [
+        "stake_vs_first30 = 47.27 (threshold 3.0)",
+        "unfamiliar_share_30d = 0.55 (threshold 0.2)",
+        "late_share_vs_first30 = 0.45 (threshold 0.1)",
+        "session_vs_first30 = 1.72 (threshold 1.5)"
+      ]
+    },
+    {
+      "player_id": 16488,
+      "p_harm": 1.0,
+      "top_reasons": [
+        "stake_vs_first30 = 15.37",
+        "unfamiliar_share_30d = 0.53",
+        "stake_90d = 25219.99"
+      ],
+      "retail_rules_triggered": [
+        "stake_vs_first30 = 15.37 (threshold 3.0)",
+        "unfamiliar_share_30d = 0.53 (threshold 0.2)",
+        "session_vs_first30 = 2.04 (threshold 1.5)"
+      ]
+    }
+  ]
+}
