@@ -1,0 +1,3 @@
+# PySpark needs Java and (for now) Python 3.12 or 3.13.
+# Installed in Docker and GitHub Actions; optional on a laptop.
+pyspark>=4.0

@@ -6,15 +6,15 @@
   },
   "clv": {
     "bgnbd_params": {
-      "r": 2.4419,
-      "alpha": 10.2891,
-      "a": 0.3171,
-      "b": 38.8317
+      "r": 2.4504,
+      "alpha": 10.3167,
+      "a": 0.3146,
+      "b": 38.2113
     },
     "gamma_gamma_params": {
-      "p": 0.7213,
-      "q": 0.9748,
-      "v": 55.7546
+      "p": 0.7245,
+      "q": 0.974,
+      "v": 55.3726
     },
     "gamma_gamma_checks": {
       "q_above_1": false,
@@ -24,30 +24,30 @@
     },
     "house_margin": 0.1036,
     "betting_days": {
-      "predicted_total": 66864,
-      "actual_total": 49907,
+      "predicted_total": 66837,
+      "actual_total": 49697,
       "spearman": 0.81
     },
     "value": {
-      "spearman_clv_model": 0.529,
-      "spearman_naive": 0.26,
+      "spearman_clv_model": 0.528,
+      "spearman_naive": 0.259,
       "top_decile_capture_clv_model": 0.76,
-      "top_decile_capture_naive": 0.677
+      "top_decile_capture_naive": 0.678
     }
   },
   "churn": {
     "churn_rate_test": 0.35,
     "roc_auc": {
-      "logistic_regression": 0.959,
-      "bgnbd_activity": 0.939,
-      "days_since_last_bet": 0.956
+      "logistic_regression": 0.96,
+      "bgnbd_activity": 0.94,
+      "days_since_last_bet": 0.958
     },
     "pr_auc": {
-      "logistic_regression": 0.948,
-      "bgnbd_activity": 0.93,
-      "days_since_last_bet": 0.943
+      "logistic_regression": 0.949,
+      "bgnbd_activity": 0.931,
+      "days_since_last_bet": 0.945
     },
-    "n_features": 29
+    "n_features": 30
   },
   "harm_exposure_without_guardrail": {
     "share_of_all_current_players_in_harm": 0.073,

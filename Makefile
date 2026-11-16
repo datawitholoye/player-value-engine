@@ -1,14 +1,26 @@
-.PHONY: setup data data-small test
+.PHONY: setup pipeline spark api test docker-build docker-run
 
-setup:
+setup:            ## install everything (add requirements-spark.txt on Python <= 3.13)
 	pip install -r requirements.txt
 	pip install -e .
 
-data:            ## full dataset (~20k players, ~6M bets)
-	python -m pve.generate_data --players 20000
+pipeline:         ## data -> features -> baselines -> models
+	python -m pve.generate_data
+	python -m pve.build_features
+	python -m pve.train_baselines
+	python -m pve.train_models
 
-data-small:      ## quick dataset for testing (~2k players)
-	python -m pve.generate_data --players 2000 --out data/small
+spark:            ## the same features with PySpark (needs Java)
+	python -m pve.spark_features
+
+api:              ## start the scoring API on http://127.0.0.1:8000/docs
+	uvicorn pve.api:app --reload
 
 test:
-	pytest -q
+	python -m pytest -q
+
+docker-build:
+	docker build -t player-value-engine .
+
+docker-run:       ## API on http://localhost:8000/docs
+	docker run --rm -p 8000:8000 player-value-engine

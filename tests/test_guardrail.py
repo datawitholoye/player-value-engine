@@ -26,7 +26,7 @@ def test_red_outranks_amber_and_amber_outranks_eligible():
 
 
 def test_rules_score_adds_points_and_ignores_unknowns():
-    row = {col: np.nan for col, _, _ in g.RULES}
+    row = {col: np.nan for col, _, _, _ in g.RULES}
     unknown = pd.DataFrame([row])
     assert g.rules_score(unknown).iloc[0] == 0          # NULL = unknown, not a warning sign
 
@@ -40,3 +40,21 @@ def test_threshold_catches_target_share_of_harmed_players():
     scores = np.where(y, rng.random(1000) + 0.5, rng.random(1000))
     t = g.threshold_for_recall(scores, y, 0.9)
     assert (scores[y] >= t).mean() >= 0.9
+
+
+def test_past_escalation_blocks_offers_even_after_going_quiet():
+    # A player who escalated and then stopped may be trying to quit:
+    # no "come back" offers, whatever their recent (blank) signals say.
+    df = pd.DataFrame({"stake_lifetime_vs_first30": [5.0, 2.0, 1.2, np.nan]})
+    assert list(g.escalation_history(df)) == [True, True, False, False]
+
+
+def test_reasons_are_plain_english():
+    row = pd.Series({col: np.nan for col, _, _, _ in g.RULES})
+    row["stake_vs_first30"] = 9.5
+    row["late_share_vs_first30"] = 0.25
+    row["stake_lifetime_vs_first30"] = 4.0
+    reasons = g.rule_reasons(row)
+    assert "Recent stakes are 9.5x their first month" in reasons
+    assert "Late-night betting is up 25 percentage points on their first month" in reasons
+    assert any("past escalation" in r for r in reasons)

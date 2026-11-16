@@ -363,6 +363,16 @@ def generate(n_players: int, seed: int = 42):
     return players, bets, deposits, sof_checks
 
 
+def save(out: Path, players, bets, deposits, sof_checks) -> None:
+    out.mkdir(parents=True, exist_ok=True)
+    # timestamps saved to the microsecond: Spark can't read nanoseconds
+    opts = dict(index=False, coerce_timestamps="us", allow_truncated_timestamps=True)
+    players.to_parquet(out / "players.parquet", **opts)
+    bets.to_parquet(out / "bets.parquet", **opts)
+    deposits.to_parquet(out / "deposits.parquet", **opts)
+    sof_checks.to_parquet(out / "sof_checks.parquet", **opts)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--players", type=int, default=20_000)
@@ -371,11 +381,7 @@ def main() -> None:
     args = ap.parse_args()
 
     players, bets, deposits, sof_checks = generate(args.players, args.seed)
-    args.out.mkdir(parents=True, exist_ok=True)
-    players.to_parquet(args.out / "players.parquet", index=False)
-    bets.to_parquet(args.out / "bets.parquet", index=False)
-    deposits.to_parquet(args.out / "deposits.parquet", index=False)
-    sof_checks.to_parquet(args.out / "sof_checks.parquet", index=False)
+    save(args.out, players, bets, deposits, sof_checks)
 
     ggr = bets["stake"].sum() - bets["returns"].sum()
     print(f"players:  {len(players):>12,}")

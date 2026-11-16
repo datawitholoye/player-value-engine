@@ -1,0 +1,48 @@
+# Runs on every push: the full test suite (including Spark vs DuckDB parity),
+# then builds the Docker image and checks the API answers.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/setup-java@v4        # Spark needs Java
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install
+        run: |
+          pip install -r requirements.txt -r requirements-spark.txt
+          pip install -e .
+
+      - name: Run tests
+        run: pytest -q
+
+  docker:
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t player-value-engine .
+
+      - name: Start the API and check it answers
+        run: |
+          docker run -d -p 8000:8000 --name pve player-value-engine
+          for i in $(seq 1 30); do curl -sf localhost:8000/health && break; sleep 2; done
+          curl -sf localhost:8000/health
+          curl -sf localhost:8000/players/1
+          curl -sf "localhost:8000/offers?limit=3"

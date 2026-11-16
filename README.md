@@ -1,12 +1,21 @@
 # Player Value & Retention Engine
 
-Predicts each player's future value and churn risk for a betting operator, and **blocks retention offers to players showing signs of gambling harm**.
+[![CI](https://github.com/datawitholoye/player-value-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/datawitholoye/player-value-engine/actions/workflows/ci.yml)
 
-> Status: in progress. Data, SQL features, baselines, LightGBM models and the safer gambling guardrail done; PySpark, API and deployment next.
+Predicts each player's future value and churn risk for a betting operator, decides who should get a retention offer, and **blocks offers to anyone showing signs of gambling harm**.
+
+> Status: data, SQL and PySpark features, baselines, LightGBM models, safer gambling guardrail, scoring API, Docker and CI done. Monitoring and the final write-up next.
+
+## Headline results
+
+- **The guardrail removes every offer to harmed players.** Ranking by predicted value alone sends 36 of 208 offers (17%) to players in harm; with the guardrail it sends **0**.
+- **Value at risk beats value for retention.** Ranking by value sends 98.6% of offers to players who would have stayed anyway. Ranking by **value x chance of churning** reaches players who then churn **77%** of the time, and the churners it reaches are worth **15x more** (£263k vs £18k).
+- **Domain knowledge beats raw model power.** The strongest harm signal is a player's stake compared with **their own first month**, from retail safer gambling practice. A LightGBM model plus these retail rules catches **94%** of harmed players with **96%** of flags correct.
+- **One pipeline, two engines.** The features are built in SQL (DuckDB) and in **PySpark**, and a test proves every value matches across both.
 
 ## Why this project
 
-Operators use player value (CLV) models to decide who gets retention offers. A naive model learns that players with escalating stakes are "high value", and those are often the players most at risk of harm. This project builds the value and churn models **and** a safer gambling guardrail, so commercial targeting never rewards harmful play.
+Operators use player value (CLV) models to decide who gets retention offers. A naive model learns that escalating stakes mean "high value", and those are often the players most at risk of harm. This project builds the value and churn models **and** a safer gambling guardrail, so commercial targeting never rewards harmful play.
 
 ## Data
 
@@ -25,23 +34,22 @@ Players come from four hidden segments: casual, regular, VIP and at-risk. The ha
 - **At-risk players** start like small regulars (about £1–5 on one market). At a hidden *harm onset* date, their stakes jump and keep escalating. They also spread into markets they never used (virtuals, casino, unfamiliar sports), bet late at night, chase losses, play longer sessions and get more declined deposits.
 - **Some regulars ("upgraders")** raise their stakes slowly for healthy reasons, with no other warning signs. They are the false positives a crude stake rule would catch.
 
-**Source-of-funds checks are triggered by behaviour**, not assigned: a check is requested the morning after a player loses **£10,000+ within 90 days** or deposits **£30,000+ within a year**. VIPs usually pass (89%); at-risk players who reach the threshold after harm onset mostly fail or never send documents (27% pass). **A failed or not-provided check suspends the account**: no more bets or deposits until documents are provided. The features only use a check's outcome if it was known by the snapshot date, so a check still under review counts as *pending*.
+**Source-of-funds checks are triggered by behaviour**: a check is requested the morning after a player loses **£10,000+ within 90 days** or deposits **£30,000+ within a year**. VIPs usually pass (89%); at-risk players who reach the threshold after harm onset mostly fail or never send documents (27% pass). **A failed or not-provided check suspends the account**: no more bets or deposits until documents are provided.
 
 Columns starting with `_` (true segment, harm onset date) are hidden truth for evaluation only and are never used as model features.
 
 ## How the pipeline works
 
 ```
-generate_data.py  ->  data/raw/  ->  sql/01..04 (DuckDB)  ->  data/features/  ->  models
+generate_data.py -> data/raw/ -> sql/01..05 (DuckDB) -> data/features/ -> models -> API
+                              -> spark_features.py (PySpark, same results)
 ```
-
-The features are built in SQL, one step per file, run in order by `src/pve/build_features.py`:
 
 | Step | Output | What it does | SQL techniques |
 |---|---|---|---|
-| `01_player_daily.sql` | ~700k player-days | Bets and deposits summarised per player per day | `GROUP BY`, `CASE WHEN`, `LEFT JOIN`, `COALESCE` |
-| `02_rolling_features.sql` | ~700k player-days | Last 7 days vs the player's previous 30 days: stake jump, late-night share, failed deposits | window functions, `RANGE` intervals, `LAG` |
-| `03_bet_patterns.sql` | ~700k player-days | Chasing losses, bets on unfamiliar markets, session lengths | `LAG` on bets, sessionisation (gaps and islands) |
+| `01_player_daily.sql` | ~660k player-days | Bets and deposits summarised per player per day | `GROUP BY`, `CASE WHEN`, `LEFT JOIN`, `COALESCE` |
+| `02_rolling_features.sql` | ~660k player-days | Last 7 days vs the player's previous 30 days: stake jump, late-night share, failed deposits | window functions, `RANGE` intervals, `LAG` |
+| `03_bet_patterns.sql` | ~660k player-days | Chasing losses, bets on unfamiliar markets, session lengths | `LAG` on bets, sessionisation (gaps and islands), tie-breaking |
 | `04_player_features.sql` | ~16k players | One row per player at a snapshot date: value (RFM), recent behaviour, change vs their first month, source-of-funds status as known on that date | `QUALIFY`, `ROW_NUMBER`, `NTILE` |
 | `05_labels.sql` | ~16k players | What actually happened after the snapshot: betting days, stake and net loss over the next 6 months, and churn (no bet within 90 days) | date arithmetic, `LEFT JOIN` + `COALESCE` |
 
@@ -49,9 +57,18 @@ Features only use data **up to the snapshot date (30 June 2025)**. What happens 
 
 **What the features show:** at the snapshot, players already in harm stake a median **9.5x** their first-month average (everyone else: about 1x; healthy "upgraders": 1.2x), and **46%** of their recent bets are on markets they never used in their first month (everyone else: under 3%). They also sit in value decile 7.7 on average, so a value model with no guardrail would prioritise them for offers.
 
+### PySpark version
+
+`src/pve/spark_features.py` rebuilds steps 01–04 with the PySpark DataFrame API, the way the pipeline would run on an operator's full data across many machines. `tests/test_spark_parity.py` runs both engines on the same data and compares **every value in every table**. On the full dataset, about 2 million values match exactly.
+
+Getting there exposed three real issues:
+- Spark can't read nanosecond timestamps, so the data is saved to the microsecond.
+- 175 bets shared the same second, which made "the previous bet" ambiguous. Ordering by time **then bet ID** gives one right answer in both engines.
+- Adding the same pennies in a different order changed totals in the 12th decimal place and swapped two players' value deciles. Ranking on money rounded to pennies fixes it.
+
 ## Baseline models
 
-Simple, explainable benchmarks that later models must beat (`python -m pve.train_baselines`, results in `reports/baseline_metrics.json`). Scored on the 6,940 players active in the 90 days before the snapshot, with a 70/30 train/test split.
+`python -m pve.train_baselines`, results in `reports/baseline_metrics.json`. Simple, explainable benchmarks that later models must beat, scored on the 6,940 players active in the 90 days before the snapshot (70/30 train/test split).
 
 **Value (next 6 months)**: BG/NBD predicts each player's future betting days; spend per day and the house margin turn that into value. BG/NBD and Gamma-Gamma are implemented from the original papers in `src/pve/clv.py` (the `lifetimes` library no longer works with current pandas) and tested by recovering known parameters from simulated players.
 
@@ -60,70 +77,109 @@ Simple, explainable benchmarks that later models must beat (`python -m pve.train
 | Naive: last 90 days repeat | 0.26 | 68% |
 | BG/NBD x spend per day x margin | **0.53** | **76%** |
 
-Gamma-Gamma was fitted but **not used**: its assumptions fail on betting data. Spend per day has a very heavy tail (q = 0.98, so the "average player" isn't defined), and players who bet more often also bet more per day (correlation 0.63), which the model assumes can't happen. The baseline checks both and falls back to each player's own history.
+Gamma-Gamma was fitted but **not used**: its assumptions fail on betting data. Spend per day has a very heavy tail (q = 0.97, so the "average player" isn't defined), and players who bet more often also bet more per day (correlation 0.63), which the model assumes can't happen. The baseline checks both and falls back to each player's own history.
 
 **Churn (no bet in the next 90 days, 35% of players)**
 
 | Model | ROC-AUC |
 |---|---|
-| BG/NBD activity forecast | 0.939 |
-| Rule: days since last bet | 0.956 |
-| Logistic regression, 29 features | 0.959 |
-
-A one-line recency rule is almost as good as logistic regression, so any more complex churn model has to justify itself against it.
-
-The source-of-funds suspension already removes the biggest-spending harmed players: 7.3% of current players are in harm, and 8.7% of the top 10% by BG/NBD value.
+| BG/NBD activity forecast | 0.940 |
+| Rule: days since last bet | 0.958 |
+| Logistic regression, 30 features | 0.960 |
 
 ## LightGBM models and the safer gambling guardrail
 
-`python -m pve.train_models`, results in `reports/model_metrics.json`. Same players and same split as the baselines.
+`python -m pve.train_models`, results in `reports/model_metrics.json`. Same players and split as the baselines.
 
-**More complex isn't always better.** LightGBM churn scores 0.960 ROC-AUC against 0.956 for the one-line recency rule, and LightGBM value (0.53 rank correlation, 74% top-decile capture) is no better than BG/NBD (0.53, 76%). Both baselines stay in use.
+**More complex isn't always better.** LightGBM churn scores 0.961 ROC-AUC against 0.958 for the one-line recency rule, and LightGBM value (0.54 rank correlation, 75% top-decile capture) is no better than BG/NBD (0.53, 76%).
 
-**A feature-rich value model makes targeting more harmful.** LightGBM learns that harm signals (escalating stakes, chasing) predict future spend, so **17.3%** of its top 10% are players in harm, twice the BG/NBD baseline. That's the case for the guardrail.
+**A feature-rich value model makes targeting more harmful.** LightGBM learns that harm signals (escalating stakes, chasing) predict future spend, so **17%** of its top 10% are players in harm, twice the BG/NBD baseline.
 
-**The guardrail policy** (`src/pve/guardrail.py`), based on retail safer gambling practice:
+**The guardrail policy** (`src/pve/guardrail.py`), based on retail safer gambling practice. Harm is always checked first:
 
 | Decision | Trigger | Action |
 |---|---|---|
 | Suspended | Source-of-funds check failed or not provided | No betting until documents are provided |
-| Red | Flagged as harm **and** 3+ retail warning signs | No offers; customer contact, self-exclusion offered if needed |
-| Amber | Flagged as harm | No promotional offers |
-| Eligible | None of the above | May receive retention offers |
+| Red | Harm model flag **and** 3+ retail warning signs | No offers; customer contact, self-exclusion offered if needed |
+| Amber | Harm model flag, **or** lifetime stake 2x+ their first month | No promotional or retention offers |
+| Eligible | Good betting history and no concerns | May receive retention offers |
 
-Missing a harmed player is treated as worse than withholding an offer from a healthy VIP, so the model's threshold is set to catch at least 90% of harmed players on the training data.
+Missing a harmed player is treated as worse than withholding an offer from a healthy VIP, so the model's threshold is set to catch at least 90% of harmed players on the training data. The **past-escalation rule** matters because a player who escalated and then went quiet may be trying to stop: their recent signals are blank, so only their history shows the risk, and they must never get a "come back" offer.
 
 | Guardrail | Harmed players caught | Flags that are correct | VIPs flagged | Regulars flagged |
 |---|---|---|---|---|
-| Retail rules only (points score) | 78% | 58% | 3.3% | 4.3% |
-| **LightGBM + retail rules** | **88%** | **96%** | 1.8% | 0% |
+| Retail rules only (points score) | 78% | 59% | 3.3% | 4.1% |
+| **LightGBM + retail rules + past escalation** | **94%** | **96%** | 1.8% | 0% |
 
-The rules alone miss players whose harm signals go quiet in the last 30 days; the model also uses longer history. Every red flag still lists the retail rules it breaks, so staff have concrete reasons for the conversation. SHAP shows the model's top drivers are the same signals: **stake vs first month**, recent stake, and **share of bets on unfamiliar markets**.
+Every flag comes with plain-English reasons (e.g. *"Recent stakes are 25.8x their first month"*), so staff have concrete points for a customer conversation. SHAP shows the model's top drivers are the retail signals: stake vs first month (lifetime and recent), number of bets, recent stake and share of bets on unfamiliar markets.
 
-**Impact on retention offers** (208 offers to the top 10% of test players by predicted value):
+**Who gets retention offers** (208 offers, 10% of test players):
 
-| | Offers to harmed players | Future value of players targeted |
-|---|---|---|
-| Value model only | 36 (17.3%) | £2.35M |
-| **With guardrail** | **1 (0.5%)** | £2.10M |
+| Offers ranked by | Offers to harmed players | Offers reaching players who then churned | Value of those churners |
+|---|---|---|---|
+| Value, no guardrail | 36 (17%) | n/a | n/a |
+| Value, with guardrail | 0 | 1.4% | £18k |
+| **Value at risk, with guardrail** | 2 (1%) | **77%** | **£263k** |
 
-The guardrail removes 35 of 36 offers to harmed players for an 11% reduction in targeted value, and that value would largely have come from harmful play.
+A valuable player who will stay anyway doesn't need an offer, so eligible players are ranked by **value at risk = value if retained x chance of churning**.
 
-**Caveat:** harm is detected almost perfectly here (ROC-AUC 0.998) because the data is synthetic and the harm labels are exact. Real labels from past interventions and self-exclusions are noisier and incomplete, so real-world performance would be lower and needs monitoring.
+**Caveat:** harm is detected almost perfectly here because the data is synthetic and the harm labels are exact. Real labels from past interventions and self-exclusions are noisier and incomplete, so real-world performance would be lower and needs monitoring.
+
+## Scoring API
+
+`src/pve/api.py` (FastAPI) answers *"can we send this player a retention offer?"*, ordered by priority: safer gambling first, then whether an offer is allowed, then churn risk and value.
+
+| Endpoint | Returns |
+|---|---|
+| `GET /health` | service status and snapshot date |
+| `GET /players/{player_id}` | guardrail decision, action and reasons; offer eligibility and queue position; churn risk and value |
+| `GET /offers?limit=100` | the retention campaign list: eligible players ranked by value at risk |
+
+Example: a red-flagged player.
+
+```json
+{
+  "player_id": 7978,
+  "safer_gambling": {
+    "decision": "red",
+    "action": "No offers. Contact the customer about their gambling; offer self-exclusion if needed",
+    "reasons": [
+      "Recent stakes are 25.8x their first month",
+      "35% of recent bets are on markets they didn't use at first",
+      "Late-night betting is up 43 percentage points on their first month",
+      "6 declined deposits in the last 30 days",
+      "Doubled their stake straight after 31% of losses (chasing)"
+    ]
+  },
+  "offer": {"eligible": false, "offer_rank": null}
+}
+```
 
 ## Quick start
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 pip install -e .
-python -m pve.generate_data      # writes data/raw/*.parquet
-python -m pve.build_features     # runs sql/ and writes data/features/*.parquet
-python -m pve.train_baselines    # fits baseline models, writes reports/baseline_metrics.json
-python -m pve.train_models       # LightGBM + guardrail, writes reports/model_metrics.json
-python -m pytest -q              # all tests should pass
+
+python -m pve.generate_data        # synthetic data -> data/raw/
+python -m pve.build_features       # SQL features   -> data/features/
+python -m pve.train_baselines      # baselines      -> reports/baseline_metrics.json
+python -m pve.train_models         # LightGBM + guardrail -> reports/model_metrics.json, models/
+uvicorn pve.api:app --reload       # API on http://127.0.0.1:8000/docs
+python -m pytest -q                # tests (Spark tests skip without PySpark + Java)
 ```
+
+**With Docker** (includes Java and PySpark, builds the data and models inside the image):
+
+```bash
+docker build -t player-value-engine .
+docker run --rm -p 8000:8000 player-value-engine     # API on http://localhost:8000/docs
+docker run --rm player-value-engine python -m pytest -q
+```
+
+**CI**: every push runs the full test suite, including Spark vs DuckDB parity, then builds the Docker image and checks the API answers (`.github/workflows/ci.yml`).
 
 ## Roadmap
 
@@ -134,10 +190,10 @@ python -m pytest -q              # all tests should pass
 - [x] BG/NBD + Gamma-Gamma CLV baseline, churn baseline
 - [x] LightGBM value and churn models with SHAP
 - [x] Safer gambling guardrail on targeting
-- [ ] PySpark feature pipeline
-- [ ] FastAPI scoring service, Docker, GitHub Actions CI
+- [x] PySpark feature pipeline with parity tests
+- [x] FastAPI scoring service, Docker, GitHub Actions CI
 - [ ] Drift monitoring and campaign uplift simulation
 
 ## Stack
 
-Python, pandas, NumPy, SciPy, scikit-learn, DuckDB/SQL, PySpark, LightGBM, SHAP, FastAPI, Docker, GitHub Actions, Evidently.
+Python, pandas, NumPy, SciPy, scikit-learn, DuckDB/SQL, PySpark, LightGBM, SHAP, FastAPI, Docker, GitHub Actions.

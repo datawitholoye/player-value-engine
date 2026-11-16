@@ -5,8 +5,10 @@ LightGBM models + the safer gambling guardrail, judged against the baselines.
   2. Value   LightGBM regressor   vs  BG/NBD baseline
   3. Harm    rules-only guardrail  vs  LightGBM model + rules
              (the model threshold is chosen on TRAINING data only)
-  4. Offers  top 10% by predicted value, with and without the guardrail
+  4. Offers  top 10% by predicted value, with and without the guardrail,
+             then targeting by VALUE AT RISK (value x chance of churning)
   5. SHAP    why the harm model flags players, in plain terms
+  6. Save    models and settings to models/ for the scoring API
 
 Uses the same players and the same 70/30 split as train_baselines.py, so
 every comparison is like-for-like.
@@ -29,13 +31,17 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
 
 from pve import guardrail as g
+from pve.clv import BetaGeo
 from pve.train_baselines import CATEGORICAL, NOT_FEATURES, load, top_decile_capture
 
 REPORTS = Path("reports")
 SEED = 42
 LGB_PARAMS = dict(n_estimators=400, learning_rate=0.03, num_leaves=31,
                   min_child_samples=30, subsample=0.8, subsample_freq=1,
-                  colsample_bytree=0.8, random_state=SEED, verbose=-1)
+                  colsample_bytree=0.8, random_state=SEED, verbose=-1,
+                  deterministic=True, force_row_wise=True)   # same result on every run
+MODELS = Path("models")
+HORIZON_DAYS = 184
 
 
 def feature_matrix(df: pd.DataFrame) -> pd.DataFrame:
@@ -97,7 +103,8 @@ def main() -> None:
     guardrails = {
         # (score used for AUC, amber mask, red mask)
         "rules_only": (rules_te, rules_te >= g.RULES_AMBER, rules_te >= g.RULES_RED),
-        "model_plus_rules": (p_harm, model_flag, model_flag & (rules_te >= g.RED_RULE_POINTS)),
+        "model_plus_rules": (p_harm, model_flag | g.escalation_history(test).to_numpy(),
+                             model_flag & (rules_te >= g.RED_RULE_POINTS)),
     }
     seg = test["_true_segment"].where(~test["_in_harm"], "at_risk_in_harm")
     harm_report = {"harmed_players_in_test": int(y_te.sum()),
@@ -139,6 +146,26 @@ def main() -> None:
         "future_value_targeted_with_guardrail": round(float(with_guard["actual_value"].sum())),
     }
 
+    # Harm first; then, for players with no concerns, churn risk matters most.
+    # A valuable player who will stay anyway doesn't need an offer, so rank
+    # eligible players by VALUE AT RISK = value if retained x chance of churning.
+    value_if_retained = test["stake_90d"].to_numpy() * margin * HORIZON_DAYS / 90
+    offers["value_if_retained"] = value_if_retained
+    offers["value_at_risk"] = value_if_retained * p_churn
+    offers["churned"] = y_churn.to_numpy().astype(bool)
+    eligible = offers[offers["decision"] == "eligible"]
+    targeting = {"by_value": eligible.nlargest(n_offers, "pred_clv"),
+                 "by_value_at_risk": eligible.nlargest(n_offers, "value_at_risk")}
+    report["targeting"] = {
+        name: {
+            # offers only help players who would otherwise leave
+            "share_of_offers_to_players_who_then_churned": round(float(t["churned"].mean()), 3),
+            # what those churners were worth: the value an offer is trying to save
+            "value_of_churners_reached": round(float(t.loc[t["churned"], "value_if_retained"].sum())),
+            "harmed_share": round(float(t["in_harm"].mean()), 3),
+        } for name, t in targeting.items()
+    }
+
     # ------------------------------------------------------------ 5. SHAP
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -158,6 +185,22 @@ def main() -> None:
             "retail_rules_triggered": g.rule_reasons(test.loc[i]),
         })
     report["red_flag_examples"] = examples
+
+    # ------------------------------------------------------------ 6. save for the API
+    MODELS.mkdir(exist_ok=True)
+    churn.booster_.save_model(str(MODELS / "churn.txt"))
+    harm.booster_.save_model(str(MODELS / "harm.txt"))
+    bg = BetaGeo().fit(train["active_days"] - 1, train["tenure_days"] - train["recency_days"],
+                       train["tenure_days"])
+    (MODELS / "settings.json").write_text(json.dumps({
+        "snapshot_date": str(train["snapshot_date"].iloc[0].date()),
+        "feature_columns": list(X_tr.columns),
+        "categorical": CATEGORICAL,
+        "harm_amber_threshold": float(model_amber_at),
+        "house_margin": float(margin),
+        "horizon_days": HORIZON_DAYS,
+        "bgnbd_params": {k: float(v) for k, v in bg.params_.items()},
+    }, indent=2))
 
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "model_metrics.json").write_text(json.dumps(report, indent=2, default=str))

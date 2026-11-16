@@ -134,13 +134,17 @@ SELECT
     m.avg_stake_30d / NULLIF(f.first30_avg_stake, 0)              AS stake_vs_first30,
     m.late_share_30d - f.first30_late_share                       AS late_share_vs_first30,
     m.session_minutes_30d / NULLIF(f.first30_session_minutes, 0)  AS session_vs_first30,
+    -- lifetime average stake vs their first month: shows PAST escalation even
+    -- after a player goes quiet (when all the 30-day signals are blank)
+    (l.total_stake / l.total_bets) / NULLIF(f.first30_avg_stake, 0) AS stake_lifetime_vs_first30,
 
     -- change vs the previous 30 days: catches sudden jumps
     r.latest_stake_jump_ratio,
     r.latest_failed_deposits_7d,
 
     -- value band: 10 = the 10% of players worth most to the operator so far
-    NTILE(10) OVER (ORDER BY l.total_net_loss)      AS value_decile
+    -- (rounded to pennies and tie-broken by player_id, so every engine agrees)
+    NTILE(10) OVER (ORDER BY ROUND(l.total_net_loss, 2), p.player_id)      AS value_decile
 
 FROM players AS p
 JOIN lifetime AS l            ON p.player_id = l.player_id

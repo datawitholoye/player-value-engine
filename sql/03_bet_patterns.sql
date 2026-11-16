@@ -5,6 +5,7 @@ CREATE OR REPLACE TABLE bet_patterns AS
 WITH ordered AS (
     SELECT
         player_id,
+        bet_id,
         placed_at,
         CAST(placed_at AS DATE)  AS bet_date,
         market,
@@ -15,7 +16,9 @@ WITH ordered AS (
         MIN(placed_at) OVER (PARTITION BY player_id, market) AS first_time_on_market,
         MIN(placed_at) OVER (PARTITION BY player_id)         AS first_bet_ever
     FROM bets
-    WINDOW by_time AS (PARTITION BY player_id ORDER BY placed_at)
+    -- bet_id breaks ties when two bets share the same second, so "previous
+    -- bet" always has exactly one answer
+    WINDOW by_time AS (PARTITION BY player_id ORDER BY placed_at, bet_id)
 ),
 flagged AS (
     SELECT
@@ -39,7 +42,7 @@ sessions AS (
     SELECT
         *,
         -- running total of session starts = a session number per player
-        SUM(new_session) OVER (PARTITION BY player_id ORDER BY placed_at
+        SUM(new_session) OVER (PARTITION BY player_id ORDER BY placed_at, bet_id
                                ROWS UNBOUNDED PRECEDING)          AS session_no
     FROM flagged
 ),
