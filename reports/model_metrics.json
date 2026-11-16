@@ -4,19 +4,19 @@
     "test": 2082
   },
   "churn": {
-    "roc_auc_lightgbm": 0.96,
+    "roc_auc_lightgbm": 0.961,
     "pr_auc_lightgbm": 0.95,
     "roc_auc_best_baseline": 0.96
   },
   "value": {
     "spearman_lightgbm": 0.535,
-    "top_decile_capture_lightgbm": 0.754,
+    "top_decile_capture_lightgbm": 0.759,
     "spearman_baseline": 0.528,
     "top_decile_capture_baseline": 0.76
   },
   "harm": {
     "harmed_players_in_test": 152,
-    "model_amber_threshold": 0.9978,
+    "model_amber_threshold": 0.9981,
     "rules_only": {
       "roc_auc": 0.794,
       "harmed_caught": 0.783,
@@ -35,7 +35,7 @@
       "median_days_since_onset_missed": 171.0
     },
     "model_plus_rules": {
-      "roc_auc": 0.997,
+      "roc_auc": 0.998,
       "harmed_caught": 0.941,
       "harmed_caught_red": 0.572,
       "precision_of_flags": 0.96,
@@ -54,36 +54,36 @@
   },
   "offers": {
     "offers_sent": 208,
-    "harmed_share_without_guardrail": 0.159,
-    "harmed_share_with_guardrail": 0.0,
-    "harmed_players_offered_without_guardrail": 33,
-    "harmed_players_offered_with_guardrail": 0,
-    "future_value_targeted_without_guardrail": 2387562,
-    "future_value_targeted_with_guardrail": 2093003
+    "harmed_share_without_guardrail": 0.168,
+    "harmed_share_with_guardrail": 0.005,
+    "harmed_players_offered_without_guardrail": 35,
+    "harmed_players_offered_with_guardrail": 1,
+    "future_value_targeted_without_guardrail": 2405338,
+    "future_value_targeted_with_guardrail": 2092509
   },
   "targeting": {
     "by_value": {
       "share_of_offers_to_players_who_then_churned": 0.014,
       "value_of_churners_reached": 18032,
-      "harmed_share": 0.0
+      "harmed_share": 0.005
     },
     "by_value_at_risk": {
       "share_of_offers_to_players_who_then_churned": 0.745,
-      "value_of_churners_reached": 262310,
+      "value_of_churners_reached": 261984,
       "harmed_share": 0.01
     }
   },
   "harm_top_features": {
-    "stake_lifetime_vs_first30": 1.7283,
-    "total_bets": 0.5031,
-    "stake_90d": 0.4508,
-    "stake_vs_first30": 0.4481,
-    "unfamiliar_share_30d": 0.4109,
-    "avg_stake_per_bet": 0.4036,
-    "failed_deposits_30d": 0.2472,
-    "bets_30d": 0.2432,
-    "latest_stake_jump_ratio": 0.2308,
-    "tenure_days": 0.2284
+    "stake_lifetime_vs_first30": 1.7197,
+    "total_bets": 0.523,
+    "stake_vs_first30": 0.4361,
+    "stake_90d": 0.4345,
+    "unfamiliar_share_30d": 0.4125,
+    "avg_stake_per_bet": 0.4007,
+    "failed_deposits_30d": 0.2682,
+    "bets_30d": 0.2467,
+    "latest_stake_jump_ratio": 0.2408,
+    "tenure_days": 0.2392
   },
   "red_flag_examples": [
     {

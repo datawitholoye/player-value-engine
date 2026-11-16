@@ -4,13 +4,16 @@
 
 Predicts each player's future value and churn risk for a betting operator, decides who should get a retention offer, and **blocks offers to anyone showing signs of gambling harm**.
 
-> Status: data, SQL and PySpark features, baselines, LightGBM models, safer gambling guardrail, scoring API, Docker and CI done. Monitoring and the final write-up next.
+> Status: data, SQL and PySpark features, baselines, LightGBM models, safer gambling guardrail, commercial impact, scoring API, Docker and CI done. Drift monitoring next.
+>
+> **Start here:** [`notebooks/01_results.ipynb`](notebooks/01_results.ipynb) tells the whole story in seven charts.
 
 ## Headline results
 
-- **The guardrail removes every offer to harmed players.** Ranking by predicted value alone sends 36 of 208 offers (17%) to players in harm; with the guardrail it sends **0**.
-- **Value at risk beats value for retention.** Ranking by value sends 98.6% of offers to players who would have stayed anyway. Ranking by **value x chance of churning** reaches players who then churn **77%** of the time, and the churners it reaches are worth **15x more** (£263k vs £18k).
+- **The guardrail stops offers to harmed players.** Ranking by predicted value alone sends 35 of 208 offers (17%) to players in harm; with the guardrail it sends **1**.
+- **Value at risk beats value for retention.** Ranking by value sends 98.6% of offers to players who would have stayed anyway. Ranking by **value x chance of churning** reaches players who then churn **75%** of the time, and the churners it reaches are worth **15x more** (£262k vs £18k).
 - **Domain knowledge beats raw model power.** The strongest harm signal is a player's stake compared with **their own first month**, from retail safer gambling practice. A LightGBM model plus these retail rules catches **94%** of harmed players with **96%** of flags correct.
+- **Commercial impact.** Churn takes **£561k** of 6-month value out of the test players. The guarded value-at-risk campaign nets about **£50k** for £2k of offers, **3-4x** more than targeting by value, and stays positive under every assumption tested.
 - **One pipeline, two engines.** The features are built in SQL (DuckDB) and in **PySpark**, and a test proves every value matches across both.
 
 ## Why this project
@@ -91,9 +94,9 @@ Gamma-Gamma was fitted but **not used**: its assumptions fail on betting data. S
 
 `python -m pve.train_models`, results in `reports/model_metrics.json`. Same players and split as the baselines.
 
-**More complex isn't always better.** LightGBM churn scores 0.961 ROC-AUC against 0.958 for the one-line recency rule, and LightGBM value (0.54 rank correlation, 75% top-decile capture) is no better than BG/NBD (0.53, 76%).
+**More complex isn't always better.** LightGBM churn scores 0.961 ROC-AUC against 0.958 for the one-line recency rule, and LightGBM value (0.54 rank correlation, 76% top-decile capture) is no better than BG/NBD (0.53, 76%).
 
-**A feature-rich value model makes targeting more harmful.** LightGBM learns that harm signals (escalating stakes, chasing) predict future spend, so **17%** of its top 10% are players in harm, twice the BG/NBD baseline.
+**A feature-rich value model makes targeting more harmful.** LightGBM learns that harm signals (escalating stakes, chasing) predict future spend, so **17%** of its top 10% are players in harm, about twice the BG/NBD baseline (9%).
 
 **The guardrail policy** (`src/pve/guardrail.py`), based on retail safer gambling practice. Harm is always checked first:
 
@@ -117,11 +120,23 @@ Every flag comes with plain-English reasons (e.g. *"Recent stakes are 25.8x thei
 
 | Offers ranked by | Offers to harmed players | Offers reaching players who then churned | Value of those churners |
 |---|---|---|---|
-| Value, no guardrail | 36 (17%) | n/a | n/a |
-| Value, with guardrail | 0 | 1.4% | £18k |
-| **Value at risk, with guardrail** | 2 (1%) | **77%** | **£263k** |
+| Value, no guardrail | 35 (17%) | n/a | n/a |
+| Value, with guardrail | 1 (0.5%) | 1.4% | £18k |
+| **Value at risk, with guardrail** | 2 (1%) | **75%** | **£262k** |
 
 A valuable player who will stay anyway doesn't need an offer, so eligible players are ranked by **value at risk = value if retained x chance of churning**.
+
+## Commercial impact
+
+`src/pve/impact.py`, charted in the notebook. On the 2,082 test players over the next 6 months, assuming an offer keeps **20%** of the would-be leavers it reaches and costs **£10** (a real operator would measure both with a controlled test):
+
+| Campaign (208 offers) | Offers reaching would-be leavers | Value saved | Cost of offers | Net impact |
+|---|---|---|---|---|
+| Value, no guardrail | 8 | £17.0k | £2.1k | £14.9k |
+| Value + guardrail | 7 | £14.9k | £2.1k | £12.8k |
+| **Value at risk + guardrail** | **155** | **£52.4k** | £2.1k | **£50.3k** |
+
+With no campaign, the 728 players who leave take **£561k** of 6-month value with them (15% of all player value). Under every combination tested (offers saving 10%, 20% or 30% of leavers, costing £5, £10 or £25), the guarded value-at-risk campaign nets between **£21k and £77k**. Without the guardrail, £2.1k of the "value saved" would have come from keeping players in harm betting; the guardrail gives that up on purpose.
 
 **Caveat:** harm is detected almost perfectly here because the data is synthetic and the harm labels are exact. Real labels from past interventions and self-exclusions are noisier and incomplete, so real-world performance would be lower and needs monitoring.
 
@@ -169,6 +184,7 @@ python -m pve.train_baselines      # baselines      -> reports/baseline_metrics.
 python -m pve.train_models         # LightGBM + guardrail -> reports/model_metrics.json, models/
 uvicorn pve.api:app_from_env --factory --reload   # API on http://127.0.0.1:8000/docs
 python -m pytest -q                # tests (Spark tests skip without PySpark + Java)
+jupyter notebook notebooks/01_results.ipynb   # or open it in VS Code
 ```
 
 **With Docker** (includes Java and PySpark, builds the data and models inside the image):
@@ -192,8 +208,9 @@ docker run --rm player-value-engine python -m pytest -q
 - [x] Safer gambling guardrail on targeting
 - [x] PySpark feature pipeline with parity tests
 - [x] FastAPI scoring service, Docker, GitHub Actions CI
-- [ ] Drift monitoring and campaign uplift simulation
+- [x] Commercial impact and results notebook
+- [ ] Drift monitoring
 
 ## Stack
 
-Python, pandas, NumPy, SciPy, scikit-learn, DuckDB/SQL, PySpark, LightGBM, SHAP, FastAPI, Docker, GitHub Actions.
+Python, pandas, NumPy, SciPy, scikit-learn, DuckDB/SQL, PySpark, LightGBM, SHAP, matplotlib, Jupyter, FastAPI, Docker, GitHub Actions.
