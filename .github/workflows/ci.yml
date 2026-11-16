@@ -10,14 +10,14 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
 
-      - uses: actions/setup-java@v4        # Spark needs Java
+      - uses: actions/setup-java@v5        # Spark needs Java
         with:
           distribution: temurin
           java-version: "17"
@@ -34,7 +34,7 @@ jobs:
     needs: tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build image
         run: docker build -t player-value-engine .

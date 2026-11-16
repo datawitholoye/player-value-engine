@@ -31,4 +31,4 @@ RUN python -m pve.generate_data \
  && python -m pve.train_models
 
 EXPOSE 8000
-CMD ["uvicorn", "pve.api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "pve.api:app_from_env", "--factory", "--host", "0.0.0.0", "--port", "8000"]

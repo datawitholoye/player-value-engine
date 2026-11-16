@@ -167,7 +167,7 @@ python -m pve.generate_data        # synthetic data -> data/raw/
 python -m pve.build_features       # SQL features   -> data/features/
 python -m pve.train_baselines      # baselines      -> reports/baseline_metrics.json
 python -m pve.train_models         # LightGBM + guardrail -> reports/model_metrics.json, models/
-uvicorn pve.api:app --reload       # API on http://127.0.0.1:8000/docs
+uvicorn pve.api:app_from_env --factory --reload   # API on http://127.0.0.1:8000/docs
 python -m pytest -q                # tests (Spark tests skip without PySpark + Java)
 ```
 

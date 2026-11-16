@@ -14,7 +14,7 @@ spark:            ## the same features with PySpark (needs Java)
 	python -m pve.spark_features
 
 api:              ## start the scoring API on http://127.0.0.1:8000/docs
-	uvicorn pve.api:app --reload
+	uvicorn pve.api:app_from_env --factory --reload
 
 test:
 	python -m pytest -q

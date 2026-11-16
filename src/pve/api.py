@@ -5,7 +5,7 @@ The answer is ordered by priority: safer gambling first, then whether an
 offer is allowed, then churn risk and value.
 
 Run locally:
-    uvicorn pve.api:app --reload
+    uvicorn pve.api:app_from_env --factory --reload
 then open http://127.0.0.1:8000/docs to try it in the browser.
 
 Endpoints:
@@ -100,6 +100,9 @@ def create_app(features_path: Path, models_dir: Path) -> FastAPI:
     return app
 
 
-# the app uvicorn runs; paths can be changed with environment variables
-app = create_app(Path(os.environ.get("PVE_FEATURES", "data/features/player_features.parquet")),
-                 Path(os.environ.get("PVE_MODELS", "models")))
+def app_from_env() -> FastAPI:
+    """Build the app when the server STARTS, not when this file is imported,
+    so importing it never needs models on disk. Paths can be changed with
+    environment variables. Run with: uvicorn pve.api:app_from_env --factory"""
+    return create_app(Path(os.environ.get("PVE_FEATURES", "data/features/player_features.parquet")),
+                      Path(os.environ.get("PVE_MODELS", "models")))
