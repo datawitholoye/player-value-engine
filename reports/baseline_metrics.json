@@ -6,51 +6,51 @@
   },
   "clv": {
     "bgnbd_params": {
-      "r": 2.4504,
-      "alpha": 10.3167,
-      "a": 0.3146,
-      "b": 38.2112
+      "r": 2.4051,
+      "alpha": 10.1283,
+      "a": 0.513,
+      "b": 80.9254
     },
     "gamma_gamma_params": {
-      "p": 0.7245,
-      "q": 0.974,
-      "v": 55.3726
+      "p": 0.7315,
+      "q": 0.9535,
+      "v": 54.2121
     },
     "gamma_gamma_checks": {
       "q_above_1": false,
-      "frequency_spend_correlation": 0.627,
+      "frequency_spend_correlation": 0.621,
       "used": false,
       "fallback": "each player's observed average stake per betting day"
     },
-    "house_margin": 0.1036,
+    "house_margin": 0.1021,
     "betting_days": {
-      "predicted_total": 66837,
-      "actual_total": 49697,
-      "spearman": 0.81
+      "predicted_total": 66610,
+      "actual_total": 51292,
+      "spearman": 0.809
     },
     "value": {
-      "spearman_clv_model": 0.528,
-      "spearman_naive": 0.259,
-      "top_decile_capture_clv_model": 0.76,
-      "top_decile_capture_naive": 0.678
+      "spearman_clv_model": 0.549,
+      "spearman_naive": 0.293,
+      "top_decile_capture_clv_model": 0.798,
+      "top_decile_capture_naive": 0.691
     }
   },
   "churn": {
     "churn_rate_test": 0.35,
     "roc_auc": {
-      "logistic_regression": 0.96,
-      "bgnbd_activity": 0.94,
-      "days_since_last_bet": 0.958
+      "logistic_regression": 0.952,
+      "bgnbd_activity": 0.935,
+      "days_since_last_bet": 0.952
     },
     "pr_auc": {
-      "logistic_regression": 0.949,
-      "bgnbd_activity": 0.931,
-      "days_since_last_bet": 0.945
+      "logistic_regression": 0.939,
+      "bgnbd_activity": 0.921,
+      "days_since_last_bet": 0.936
     },
     "n_features": 30
   },
   "harm_exposure_without_guardrail": {
-    "share_of_all_current_players_in_harm": 0.073,
+    "share_of_all_current_players_in_harm": 0.065,
     "share_of_top_decile_targets_in_harm": 0.087
   }
 }

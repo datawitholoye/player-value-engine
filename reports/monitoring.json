@@ -1,0 +1,510 @@
+{
+  "baseline": [
+    {
+      "snapshot": "2025-06-30",
+      "current_players": 6940,
+      "psi": {
+        "stake_30d": 0.0,
+        "bets_30d": 0.0,
+        "active_days_30d": 0.0,
+        "stake_vs_first30": 0.0,
+        "unfamiliar_share_30d": 0.0,
+        "late_share_vs_first30": 0.0,
+        "chase_rate_30d": 0.0,
+        "latest_stake_jump_ratio": 0.0,
+        "session_vs_first30": 0.0,
+        "harm_score": 0.0,
+        "churn_probability": 0.0
+      },
+      "flagged_share": 0.0705,
+      "decisions": {
+        "eligible": 0.9295,
+        "red": 0.0452,
+        "suspended": 0.0134,
+        "amber": 0.0118
+      },
+      "churn_roc_auc": 0.989,
+      "hindsight": {
+        "share_in_harm": 0.0705,
+        "healthy_players_flagged": 0.0051,
+        "harmed_players_flagged": 0.9325,
+        "rules_only_healthy_flagged": 0.042
+      },
+      "status": "stable",
+      "drifted_features": []
+    },
+    {
+      "snapshot": "2025-07-31",
+      "current_players": 6988,
+      "psi": {
+        "stake_30d": 0.003,
+        "bets_30d": 0.001,
+        "active_days_30d": 0.003,
+        "stake_vs_first30": 0.003,
+        "unfamiliar_share_30d": 0.001,
+        "late_share_vs_first30": 0.001,
+        "chase_rate_30d": 0.005,
+        "latest_stake_jump_ratio": 0.002,
+        "session_vs_first30": 0.002,
+        "harm_score": 0.004,
+        "churn_probability": 0.03
+      },
+      "flagged_share": 0.0651,
+      "decisions": {
+        "eligible": 0.9349,
+        "red": 0.0451,
+        "suspended": 0.0113,
+        "amber": 0.0087
+      },
+      "churn_roc_auc": 0.956,
+      "hindsight": {
+        "share_in_harm": 0.0685,
+        "healthy_players_flagged": 0.0045,
+        "harmed_players_flagged": 0.8894,
+        "rules_only_healthy_flagged": 0.0495
+      },
+      "status": "stable",
+      "drifted_features": []
+    },
+    {
+      "snapshot": "2025-08-31",
+      "current_players": 7051,
+      "psi": {
+        "stake_30d": 0.004,
+        "bets_30d": 0.002,
+        "active_days_30d": 0.002,
+        "stake_vs_first30": 0.002,
+        "unfamiliar_share_30d": 0.002,
+        "late_share_vs_first30": 0.001,
+        "chase_rate_30d": 0.003,
+        "latest_stake_jump_ratio": 0.002,
+        "session_vs_first30": 0.002,
+        "harm_score": 0.003,
+        "churn_probability": 0.034
+      },
+      "flagged_share": 0.0644,
+      "decisions": {
+        "eligible": 0.9356,
+        "red": 0.0445,
+        "suspended": 0.0118,
+        "amber": 0.0081
+      },
+      "churn_roc_auc": 0.96,
+      "hindsight": {
+        "share_in_harm": 0.0667,
+        "healthy_players_flagged": 0.004,
+        "harmed_players_flagged": 0.9106,
+        "rules_only_healthy_flagged": 0.0494
+      },
+      "status": "stable",
+      "drifted_features": []
+    },
+    {
+      "snapshot": "2025-09-30",
+      "current_players": 6504,
+      "psi": {
+        "stake_30d": 0.016,
+        "bets_30d": 0.014,
+        "active_days_30d": 0.025,
+        "stake_vs_first30": 0.08,
+        "unfamiliar_share_30d": 0.024,
+        "late_share_vs_first30": 0.014,
+        "chase_rate_30d": 0.014,
+        "latest_stake_jump_ratio": 0.035,
+        "session_vs_first30": 0.089,
+        "harm_score": 0.021,
+        "churn_probability": 0.024
+      },
+      "flagged_share": 0.0718,
+      "decisions": {
+        "eligible": 0.9282,
+        "red": 0.0487,
+        "suspended": 0.014,
+        "amber": 0.0091
+      },
+      "churn_roc_auc": 0.967,
+      "hindsight": {
+        "share_in_harm": 0.075,
+        "healthy_players_flagged": 0.0047,
+        "harmed_players_flagged": 0.8996,
+        "rules_only_healthy_flagged": 0.0485
+      },
+      "status": "stable",
+      "drifted_features": []
+    },
+    {
+      "snapshot": "2025-10-31",
+      "current_players": 5676,
+      "psi": {
+        "stake_30d": 0.053,
+        "bets_30d": 0.044,
+        "active_days_30d": 0.067,
+        "stake_vs_first30": 0.185,
+        "unfamiliar_share_30d": 0.083,
+        "late_share_vs_first30": 0.059,
+        "chase_rate_30d": 0.023,
+        "latest_stake_jump_ratio": 0.074,
+        "session_vs_first30": 0.201,
+        "harm_score": 0.077,
+        "churn_probability": 0.036
+      },
+      "flagged_share": 0.0854,
+      "decisions": {
+        "eligible": 0.9146,
+        "red": 0.0573,
+        "suspended": 0.0183,
+        "amber": 0.0099
+      },
+      "churn_roc_auc": null,
+      "hindsight": {
+        "share_in_harm": 0.0883,
+        "healthy_players_flagged": 0.0064,
+        "harmed_players_flagged": 0.9022,
+        "rules_only_healthy_flagged": 0.0466
+      },
+      "status": "watch",
+      "drifted_features": [
+        "stake_vs_first30",
+        "session_vs_first30"
+      ]
+    },
+    {
+      "snapshot": "2025-11-30",
+      "current_players": 4810,
+      "psi": {
+        "stake_30d": 0.078,
+        "bets_30d": 0.068,
+        "active_days_30d": 0.095,
+        "stake_vs_first30": 0.156,
+        "unfamiliar_share_30d": 0.094,
+        "late_share_vs_first30": 0.058,
+        "chase_rate_30d": 0.032,
+        "latest_stake_jump_ratio": 0.178,
+        "session_vs_first30": 0.192,
+        "harm_score": 0.134,
+        "churn_probability": 0.061
+      },
+      "flagged_share": 0.0952,
+      "decisions": {
+        "eligible": 0.9048,
+        "red": 0.0624,
+        "suspended": 0.0185,
+        "amber": 0.0143
+      },
+      "churn_roc_auc": null,
+      "hindsight": {
+        "share_in_harm": 0.096,
+        "healthy_players_flagged": 0.0048,
+        "harmed_players_flagged": 0.9459,
+        "rules_only_healthy_flagged": 0.0448
+      },
+      "status": "watch",
+      "drifted_features": [
+        "stake_vs_first30",
+        "latest_stake_jump_ratio",
+        "session_vs_first30",
+        "harm_score"
+      ]
+    },
+    {
+      "snapshot": "2025-12-31",
+      "current_players": 4077,
+      "psi": {
+        "stake_30d": 0.136,
+        "bets_30d": 0.111,
+        "active_days_30d": 0.125,
+        "stake_vs_first30": 0.177,
+        "unfamiliar_share_30d": 0.102,
+        "late_share_vs_first30": 0.075,
+        "chase_rate_30d": 0.052,
+        "latest_stake_jump_ratio": 0.26,
+        "session_vs_first30": 0.21,
+        "harm_score": 0.204,
+        "churn_probability": 0.097
+      },
+      "flagged_share": 0.1023,
+      "decisions": {
+        "eligible": 0.8977,
+        "red": 0.0616,
+        "amber": 0.0206,
+        "suspended": 0.0201
+      },
+      "churn_roc_auc": null,
+      "hindsight": {
+        "share_in_harm": 0.104,
+        "healthy_players_flagged": 0.0041,
+        "harmed_players_flagged": 0.9481,
+        "rules_only_healthy_flagged": 0.0512
+      },
+      "status": "alert",
+      "drifted_features": [
+        "stake_30d",
+        "bets_30d",
+        "active_days_30d",
+        "stake_vs_first30",
+        "unfamiliar_share_30d",
+        "latest_stake_jump_ratio",
+        "session_vs_first30",
+        "harm_score"
+      ]
+    }
+  ],
+  "events": [
+    {
+      "snapshot": "2025-06-30",
+      "current_players": 6940,
+      "psi": {
+        "stake_30d": 0.0,
+        "bets_30d": 0.0,
+        "active_days_30d": 0.0,
+        "stake_vs_first30": 0.0,
+        "unfamiliar_share_30d": 0.0,
+        "late_share_vs_first30": 0.0,
+        "chase_rate_30d": 0.0,
+        "latest_stake_jump_ratio": 0.0,
+        "session_vs_first30": 0.0,
+        "harm_score": 0.0,
+        "churn_probability": 0.0
+      },
+      "flagged_share": 0.0705,
+      "decisions": {
+        "eligible": 0.9295,
+        "red": 0.0452,
+        "suspended": 0.0134,
+        "amber": 0.0118
+      },
+      "churn_roc_auc": 0.989,
+      "hindsight": {
+        "share_in_harm": 0.0705,
+        "healthy_players_flagged": 0.0051,
+        "harmed_players_flagged": 0.9325,
+        "rules_only_healthy_flagged": 0.042
+      },
+      "status": "stable",
+      "drifted_features": []
+    },
+    {
+      "snapshot": "2025-07-31",
+      "current_players": 6988,
+      "psi": {
+        "stake_30d": 0.003,
+        "bets_30d": 0.001,
+        "active_days_30d": 0.003,
+        "stake_vs_first30": 0.003,
+        "unfamiliar_share_30d": 0.001,
+        "late_share_vs_first30": 0.001,
+        "chase_rate_30d": 0.005,
+        "latest_stake_jump_ratio": 0.002,
+        "session_vs_first30": 0.002,
+        "harm_score": 0.004,
+        "churn_probability": 0.03
+      },
+      "flagged_share": 0.0651,
+      "decisions": {
+        "eligible": 0.9349,
+        "red": 0.0451,
+        "suspended": 0.0113,
+        "amber": 0.0087
+      },
+      "churn_roc_auc": 0.956,
+      "hindsight": {
+        "share_in_harm": 0.0685,
+        "healthy_players_flagged": 0.0045,
+        "harmed_players_flagged": 0.8894,
+        "rules_only_healthy_flagged": 0.0495
+      },
+      "status": "stable",
+      "drifted_features": []
+    },
+    {
+      "snapshot": "2025-08-31",
+      "current_players": 7051,
+      "psi": {
+        "stake_30d": 0.004,
+        "bets_30d": 0.002,
+        "active_days_30d": 0.002,
+        "stake_vs_first30": 0.002,
+        "unfamiliar_share_30d": 0.002,
+        "late_share_vs_first30": 0.001,
+        "chase_rate_30d": 0.003,
+        "latest_stake_jump_ratio": 0.002,
+        "session_vs_first30": 0.002,
+        "harm_score": 0.003,
+        "churn_probability": 0.034
+      },
+      "flagged_share": 0.0644,
+      "decisions": {
+        "eligible": 0.9356,
+        "red": 0.0445,
+        "suspended": 0.0118,
+        "amber": 0.0081
+      },
+      "churn_roc_auc": 0.96,
+      "hindsight": {
+        "share_in_harm": 0.0667,
+        "healthy_players_flagged": 0.004,
+        "harmed_players_flagged": 0.9106,
+        "rules_only_healthy_flagged": 0.0494
+      },
+      "status": "stable",
+      "drifted_features": []
+    },
+    {
+      "snapshot": "2025-09-30",
+      "current_players": 6504,
+      "psi": {
+        "stake_30d": 0.016,
+        "bets_30d": 0.014,
+        "active_days_30d": 0.025,
+        "stake_vs_first30": 0.08,
+        "unfamiliar_share_30d": 0.024,
+        "late_share_vs_first30": 0.014,
+        "chase_rate_30d": 0.014,
+        "latest_stake_jump_ratio": 0.035,
+        "session_vs_first30": 0.089,
+        "harm_score": 0.021,
+        "churn_probability": 0.024
+      },
+      "flagged_share": 0.0718,
+      "decisions": {
+        "eligible": 0.9282,
+        "red": 0.0487,
+        "suspended": 0.014,
+        "amber": 0.0091
+      },
+      "churn_roc_auc": 0.967,
+      "hindsight": {
+        "share_in_harm": 0.075,
+        "healthy_players_flagged": 0.0047,
+        "harmed_players_flagged": 0.8996,
+        "rules_only_healthy_flagged": 0.0485
+      },
+      "status": "stable",
+      "drifted_features": []
+    },
+    {
+      "snapshot": "2025-10-31",
+      "current_players": 5676,
+      "psi": {
+        "stake_30d": 0.053,
+        "bets_30d": 0.044,
+        "active_days_30d": 0.067,
+        "stake_vs_first30": 0.185,
+        "unfamiliar_share_30d": 1.971,
+        "late_share_vs_first30": 0.059,
+        "chase_rate_30d": 0.037,
+        "latest_stake_jump_ratio": 0.074,
+        "session_vs_first30": 0.201,
+        "harm_score": 1.176,
+        "churn_probability": 0.037
+      },
+      "flagged_share": 0.0858,
+      "decisions": {
+        "eligible": 0.9142,
+        "red": 0.0574,
+        "suspended": 0.0183,
+        "amber": 0.01
+      },
+      "churn_roc_auc": null,
+      "hindsight": {
+        "share_in_harm": 0.0883,
+        "healthy_players_flagged": 0.0064,
+        "harmed_players_flagged": 0.9062,
+        "rules_only_healthy_flagged": 0.5702
+      },
+      "status": "alert",
+      "drifted_features": [
+        "stake_vs_first30",
+        "unfamiliar_share_30d",
+        "session_vs_first30",
+        "harm_score"
+      ]
+    },
+    {
+      "snapshot": "2025-11-30",
+      "current_players": 4810,
+      "psi": {
+        "stake_30d": 0.105,
+        "bets_30d": 0.113,
+        "active_days_30d": 0.1,
+        "stake_vs_first30": 0.163,
+        "unfamiliar_share_30d": 0.097,
+        "late_share_vs_first30": 0.067,
+        "chase_rate_30d": 0.036,
+        "latest_stake_jump_ratio": 0.174,
+        "session_vs_first30": 0.282,
+        "harm_score": 0.174,
+        "churn_probability": 0.06
+      },
+      "flagged_share": 0.0948,
+      "decisions": {
+        "eligible": 0.9052,
+        "red": 0.0624,
+        "suspended": 0.0185,
+        "amber": 0.0139
+      },
+      "churn_roc_auc": null,
+      "hindsight": {
+        "share_in_harm": 0.096,
+        "healthy_players_flagged": 0.0048,
+        "harmed_players_flagged": 0.9416,
+        "rules_only_healthy_flagged": 0.0681
+      },
+      "status": "alert",
+      "drifted_features": [
+        "stake_30d",
+        "bets_30d",
+        "stake_vs_first30",
+        "latest_stake_jump_ratio",
+        "session_vs_first30",
+        "harm_score"
+      ]
+    },
+    {
+      "snapshot": "2025-12-31",
+      "current_players": 4077,
+      "psi": {
+        "stake_30d": 0.185,
+        "bets_30d": 0.21,
+        "active_days_30d": 0.137,
+        "stake_vs_first30": 0.178,
+        "unfamiliar_share_30d": 0.119,
+        "late_share_vs_first30": 0.092,
+        "chase_rate_30d": 0.087,
+        "latest_stake_jump_ratio": 0.258,
+        "session_vs_first30": 0.471,
+        "harm_score": 0.263,
+        "churn_probability": 0.084
+      },
+      "flagged_share": 0.1028,
+      "decisions": {
+        "eligible": 0.8972,
+        "red": 0.063,
+        "suspended": 0.0201,
+        "amber": 0.0196
+      },
+      "churn_roc_auc": null,
+      "hindsight": {
+        "share_in_harm": 0.104,
+        "healthy_players_flagged": 0.0041,
+        "harmed_players_flagged": 0.9528,
+        "rules_only_healthy_flagged": 0.0791
+      },
+      "status": "alert",
+      "drifted_features": [
+        "stake_30d",
+        "bets_30d",
+        "active_days_30d",
+        "stake_vs_first30",
+        "unfamiliar_share_30d",
+        "latest_stake_jump_ratio",
+        "session_vs_first30",
+        "harm_score"
+      ]
+    }
+  ],
+  "thresholds": {
+    "psi_watch": 0.1,
+    "psi_alert": 0.25
+  }
+}

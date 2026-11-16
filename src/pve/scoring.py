@@ -88,8 +88,8 @@ def score_players(features: pd.DataFrame, models_dir: Path) -> pd.DataFrame:
         if row["sof_status"] in ("failed", "not_provided"):
             r.append(f"Source-of-funds check {row['sof_status'].replace('_', ' ')}")
         if model_flag[features.index.get_loc(i)]:
-            r.append(f"Harm model score {p_harm[features.index.get_loc(i)]:.3f} "
-                     f"(flagged from {settings['harm_amber_threshold']:.3f})")
+            r.append(f"Harm model score {p_harm[features.index.get_loc(i)]:.4f} "
+                     f"(flagged from {settings['harm_amber_threshold']:.4f})")
         r += g.rule_reasons(row)
         reasons.append(r)
     out["reasons"] = reasons

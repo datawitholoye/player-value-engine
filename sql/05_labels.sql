@@ -4,8 +4,9 @@
 
 CREATE OR REPLACE TABLE labels AS
 WITH params AS (
+    -- the snapshot date is set by the runner (build_features.py, default 30 June 2025)
     SELECT
-        DATE '2025-06-30' AS snapshot_date,
+        getvariable('snapshot_date') AS snapshot_date,
         90                AS churn_days,     -- no bet for 90 days = churned
         184               AS value_days      -- 1 Jul - 31 Dec 2025
 ),

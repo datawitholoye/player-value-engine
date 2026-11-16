@@ -4,135 +4,134 @@
     "test": 2082
   },
   "churn": {
-    "roc_auc_lightgbm": 0.961,
-    "pr_auc_lightgbm": 0.95,
-    "roc_auc_best_baseline": 0.96
+    "roc_auc_lightgbm": 0.957,
+    "pr_auc_lightgbm": 0.942,
+    "roc_auc_best_baseline": 0.952
   },
   "value": {
-    "spearman_lightgbm": 0.535,
-    "top_decile_capture_lightgbm": 0.759,
-    "spearman_baseline": 0.528,
-    "top_decile_capture_baseline": 0.76
+    "spearman_lightgbm": 0.561,
+    "top_decile_capture_lightgbm": 0.794,
+    "spearman_baseline": 0.549,
+    "top_decile_capture_baseline": 0.798
   },
   "harm": {
-    "harmed_players_in_test": 152,
-    "model_amber_threshold": 0.9981,
+    "harmed_players_in_test": 135,
+    "model_amber_threshold": 0.9996,
     "rules_only": {
-      "roc_auc": 0.794,
-      "harmed_caught": 0.783,
-      "harmed_caught_red": 0.526,
-      "precision_of_flags": 0.589,
+      "roc_auc": 0.822,
+      "harmed_caught": 0.8,
+      "harmed_caught_red": 0.593,
+      "precision_of_flags": 0.543,
       "red_precision": 0.976,
-      "players_flagged": 202,
+      "players_flagged": 199,
       "share_flagged_by_group": {
         "at_risk": 0.015,
-        "at_risk_in_harm": 0.783,
-        "casual": 0.053,
-        "regular": 0.041,
-        "vip": 0.033
+        "at_risk_in_harm": 0.8,
+        "casual": 0.063,
+        "regular": 0.042,
+        "vip": 0.032
       },
-      "median_days_since_onset_caught": 120.0,
-      "median_days_since_onset_missed": 171.0
+      "median_days_since_onset_caught": 115.0,
+      "median_days_since_onset_missed": 165.0
     },
     "model_plus_rules": {
-      "roc_auc": 0.998,
-      "harmed_caught": 0.941,
-      "harmed_caught_red": 0.572,
-      "precision_of_flags": 0.96,
+      "roc_auc": 0.993,
+      "harmed_caught": 0.874,
+      "harmed_caught_red": 0.6,
+      "precision_of_flags": 0.944,
       "red_precision": 1.0,
-      "players_flagged": 149,
+      "players_flagged": 125,
       "share_flagged_by_group": {
         "at_risk": 0.0,
-        "at_risk_in_harm": 0.941,
-        "casual": 0.002,
-        "regular": 0.0,
-        "vip": 0.018
+        "at_risk_in_harm": 0.874,
+        "casual": 0.005,
+        "regular": 0.001,
+        "vip": 0.012
       },
-      "median_days_since_onset_caught": 147.0,
-      "median_days_since_onset_missed": 5.0
+      "median_days_since_onset_caught": 150.5,
+      "median_days_since_onset_missed": 23.0
     }
   },
   "offers": {
     "offers_sent": 208,
-    "harmed_share_without_guardrail": 0.168,
-    "harmed_share_with_guardrail": 0.005,
-    "harmed_players_offered_without_guardrail": 35,
-    "harmed_players_offered_with_guardrail": 1,
-    "future_value_targeted_without_guardrail": 2405338,
-    "future_value_targeted_with_guardrail": 2092509
+    "harmed_share_without_guardrail": 0.163,
+    "harmed_share_with_guardrail": 0.014,
+    "harmed_players_offered_without_guardrail": 34,
+    "harmed_players_offered_with_guardrail": 3,
+    "future_value_targeted_without_guardrail": 2679618,
+    "future_value_targeted_with_guardrail": 2538932
   },
   "targeting": {
     "by_value": {
-      "share_of_offers_to_players_who_then_churned": 0.014,
-      "value_of_churners_reached": 18032,
-      "harmed_share": 0.005
+      "share_of_offers_to_players_who_then_churned": 0.019,
+      "value_of_churners_reached": 36992,
+      "harmed_share": 0.014
     },
     "by_value_at_risk": {
-      "share_of_offers_to_players_who_then_churned": 0.745,
-      "value_of_churners_reached": 261984,
-      "harmed_share": 0.01
+      "share_of_offers_to_players_who_then_churned": 0.76,
+      "value_of_churners_reached": 244203,
+      "harmed_share": 0.014
     }
   },
   "harm_top_features": {
-    "stake_lifetime_vs_first30": 1.7197,
-    "total_bets": 0.523,
-    "stake_vs_first30": 0.4361,
-    "stake_90d": 0.4345,
-    "unfamiliar_share_30d": 0.4125,
-    "avg_stake_per_bet": 0.4007,
-    "failed_deposits_30d": 0.2682,
-    "bets_30d": 0.2467,
-    "latest_stake_jump_ratio": 0.2408,
-    "tenure_days": 0.2392
+    "stake_lifetime_vs_first30": 1.6059,
+    "total_bets": 0.8389,
+    "stake_90d": 0.5765,
+    "unfamiliar_share_30d": 0.547,
+    "stake_vs_first30": 0.4791,
+    "avg_stake_per_bet": 0.4417,
+    "tenure_days": 0.2596,
+    "latest_stake_jump_ratio": 0.2577,
+    "bets_30d": 0.2484,
+    "chase_rate_30d": 0.1577
   },
   "red_flag_examples": [
     {
-      "player_id": 7978,
+      "player_id": 265,
       "p_harm": 1.0,
       "top_reasons": [
-        "stake_lifetime_vs_first30 = 17.18",
-        "stake_vs_first30 = 25.80",
-        "failed_deposits_30d = 6.00"
+        "stake_lifetime_vs_first30 = 2.93",
+        "stake_vs_first30 = 6.74",
+        "unfamiliar_share_30d = 0.47"
       ],
       "retail_rules_triggered": [
-        "Recent stakes are 25.8x their first month",
-        "35% of recent bets are on markets they didn't use at first",
-        "Late-night betting is up 43 percentage points on their first month",
-        "6 declined deposits in the last 30 days",
-        "Doubled their stake straight after 31% of losses (chasing)",
-        "Sessions are 3.2x longer than in their first month",
-        "Lifetime average stake is 17.2x their first month (past escalation)"
+        "Recent stakes are 6.7x their first month",
+        "47% of recent bets are on markets they didn't use at first",
+        "Late-night betting is up 44 percentage points on their first month",
+        "4 declined deposits in the last 30 days",
+        "Lifetime average stake is 2.9x their first month (past escalation)"
       ]
     },
     {
-      "player_id": 13041,
+      "player_id": 2387,
       "p_harm": 1.0,
       "top_reasons": [
-        "stake_lifetime_vs_first30 = 17.46",
-        "stake_vs_first30 = 47.27",
-        "unfamiliar_share_30d = 0.55"
+        "stake_lifetime_vs_first30 = 8.70",
+        "stake_vs_first30 = 23.27",
+        "unfamiliar_share_30d = 0.40"
       ],
       "retail_rules_triggered": [
-        "Recent stakes are 47.3x their first month",
-        "55% of recent bets are on markets they didn't use at first",
-        "Late-night betting is up 45 percentage points on their first month",
-        "Sessions are 1.7x longer than in their first month",
-        "Lifetime average stake is 17.5x their first month (past escalation)"
+        "Recent stakes are 23.3x their first month",
+        "40% of recent bets are on markets they didn't use at first",
+        "3 declined deposits in the last 30 days",
+        "Lifetime average stake is 8.7x their first month (past escalation)"
       ]
     },
     {
-      "player_id": 16488,
+      "player_id": 9672,
       "p_harm": 1.0,
       "top_reasons": [
-        "stake_lifetime_vs_first30 = 7.98",
-        "stake_vs_first30 = 15.37",
-        "unfamiliar_share_30d = 0.53"
+        "stake_lifetime_vs_first30 = 4.08",
+        "stake_vs_first30 = 5.68",
+        "unfamiliar_share_30d = 0.52"
       ],
       "retail_rules_triggered": [
-        "Recent stakes are 15.4x their first month",
-        "53% of recent bets are on markets they didn't use at first",
-        "Sessions are 2.0x longer than in their first month",
-        "Lifetime average stake is 8.0x their first month (past escalation)"
+        "Recent stakes are 5.7x their first month",
+        "52% of recent bets are on markets they didn't use at first",
+        "Late-night betting is up 17 percentage points on their first month",
+        "3 declined deposits in the last 30 days",
+        "Sessions are 2.2x longer than in their first month",
+        "Lifetime average stake is 4.1x their first month (past escalation)"
       ]
     }
   ]

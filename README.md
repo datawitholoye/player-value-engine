@@ -2,19 +2,18 @@
 
 [![CI](https://github.com/datawitholoye/player-value-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/datawitholoye/player-value-engine/actions/workflows/ci.yml)
 
-Predicts each player's future value and churn risk for a betting operator, decides who should get a retention offer, and **blocks offers to anyone showing signs of gambling harm**.
+Predicts each player's future value and churn risk for a betting operator, decides who should get a retention offer, **blocks offers to anyone showing signs of gambling harm**, and monitors whether the models still hold up as players change.
 
-> Status: data, SQL and PySpark features, baselines, LightGBM models, safer gambling guardrail, commercial impact, scoring API, Docker and CI done. Drift monitoring next.
->
-> **Start here:** [`notebooks/01_results.ipynb`](notebooks/01_results.ipynb) tells the whole story in seven charts.
+> **Start here:** [`notebooks/01_results.ipynb`](notebooks/01_results.ipynb) tells the whole story in eight charts.
 
 ## Headline results
 
-- **The guardrail stops offers to harmed players.** Ranking by predicted value alone sends 35 of 208 offers (17%) to players in harm; with the guardrail it sends **1**.
-- **Value at risk beats value for retention.** Ranking by value sends 98.6% of offers to players who would have stayed anyway. Ranking by **value x chance of churning** reaches players who then churn **75%** of the time, and the churners it reaches are worth **15x more** (£262k vs £18k).
-- **Domain knowledge beats raw model power.** The strongest harm signal is a player's stake compared with **their own first month**, from retail safer gambling practice. A LightGBM model plus these retail rules catches **94%** of harmed players with **96%** of flags correct.
-- **Commercial impact.** Churn takes **£561k** of 6-month value out of the test players. The guarded value-at-risk campaign nets about **£50k** for £2k of offers, **3-4x** more than targeting by value, and stays positive under every assumption tested.
-- **One pipeline, two engines.** The features are built in SQL (DuckDB) and in **PySpark**, and a test proves every value matches across both.
+- **The guardrail stops offers to harmed players.** Ranking by predicted value alone sends 34 of 208 offers (16%) to players in harm; with the guardrail it sends 3 (1.4%).
+- **Value at risk beats value for retention.** Ranking by value sends almost every offer to players who would have stayed anyway. Ranking by **value x chance of churning** reaches players who then leave **76%** of the time (158 of 208 offers, against 9).
+- **Commercial impact.** Churn takes **£426k** of 6-month value out of the test players. The guarded value-at-risk campaign nets about **£47k** for £2k of offers, about **3x** more than targeting by value, and stays positive under every assumption tested.
+- **Domain knowledge beats raw model power.** The strongest harm signal is a player's stake compared with **their own first month**, from retail safer gambling practice. A LightGBM model plus these retail rules catches **87%** of harmed players with **94%** of flags correct.
+- **The monitor catches drift without false alarms on customers.** When a new virtuals game launches, retail rules alone would wrongly flag **57%** of healthy players for trying it; the guardrail flags **0.6%**, while the monitor raises the alert for a person to review.
+- **One pipeline, two engines, identical results.** The features are built in SQL (DuckDB) and in **PySpark**, and a test proves every value matches. Every build is byte-for-byte reproducible.
 
 ## Why this project
 
@@ -45,7 +44,7 @@ Columns starting with `_` (true segment, harm onset date) are hidden truth for e
 
 ```
 generate_data.py -> data/raw/ -> sql/01..05 (DuckDB) -> data/features/ -> models -> API
-                              -> spark_features.py (PySpark, same results)
+                              -> spark_features.py (PySpark, same results)       -> monitor
 ```
 
 | Step | Output | What it does | SQL techniques |
@@ -56,7 +55,7 @@ generate_data.py -> data/raw/ -> sql/01..05 (DuckDB) -> data/features/ -> models
 | `04_player_features.sql` | ~16k players | One row per player at a snapshot date: value (RFM), recent behaviour, change vs their first month, source-of-funds status as known on that date | `QUALIFY`, `ROW_NUMBER`, `NTILE` |
 | `05_labels.sql` | ~16k players | What actually happened after the snapshot: betting days, stake and net loss over the next 6 months, and churn (no bet within 90 days) | date arithmetic, `LEFT JOIN` + `COALESCE` |
 
-Features only use data **up to the snapshot date (30 June 2025)**. What happens afterwards becomes the label for the models, so no future information leaks into training.
+Features only use data **up to the snapshot date** (30 June 2025 by default; the monitor reuses the same SQL for later months). What happens afterwards becomes the label for the models, so no future information leaks into training.
 
 **What the features show:** at the snapshot, players already in harm stake a median **9.5x** their first-month average (everyone else: about 1x; healthy "upgraders": 1.2x), and **46%** of their recent bets are on markets they never used in their first month (everyone else: under 3%). They also sit in value decile 7.7 on average, so a value model with no guardrail would prioritise them for offers.
 
@@ -69,6 +68,10 @@ Getting there exposed three real issues:
 - 175 bets shared the same second, which made "the previous bet" ambiguous. Ordering by time **then bet ID** gives one right answer in both engines.
 - Adding the same pennies in a different order changed totals in the 12th decimal place and swapped two players' value deciles. Ranking on money rounded to pennies fixes it.
 
+### Reproducibility
+
+Every build gives byte-identical features and identical models. DuckDB runs single-threaded (parallel adding can change totals in the 10th decimal place, enough to change a LightGBM split), tables are sorted before saving and loading, and LightGBM runs in deterministic mode.
+
 ## Baseline models
 
 `python -m pve.train_baselines`, results in `reports/baseline_metrics.json`. Simple, explainable benchmarks that later models must beat, scored on the 6,940 players active in the 90 days before the snapshot (70/30 train/test split).
@@ -77,26 +80,26 @@ Getting there exposed three real issues:
 
 | Model | Rank correlation with actual value | Share of future value in top 10% |
 |---|---|---|
-| Naive: last 90 days repeat | 0.26 | 68% |
-| BG/NBD x spend per day x margin | **0.53** | **76%** |
+| Naive: last 90 days repeat | 0.29 | 69% |
+| BG/NBD x spend per day x margin | **0.55** | **80%** |
 
-Gamma-Gamma was fitted but **not used**: its assumptions fail on betting data. Spend per day has a very heavy tail (q = 0.97, so the "average player" isn't defined), and players who bet more often also bet more per day (correlation 0.63), which the model assumes can't happen. The baseline checks both and falls back to each player's own history.
+Gamma-Gamma was fitted but **not used**: its assumptions fail on betting data. Spend per day has a very heavy tail (q = 0.95, so the "average player" isn't defined), and players who bet more often also bet more per day (correlation 0.62), which the model assumes can't happen. The baseline checks both and falls back to each player's own history.
 
 **Churn (no bet in the next 90 days, 35% of players)**
 
 | Model | ROC-AUC |
 |---|---|
-| BG/NBD activity forecast | 0.940 |
-| Rule: days since last bet | 0.958 |
-| Logistic regression, 30 features | 0.960 |
+| BG/NBD activity forecast | 0.935 |
+| Rule: days since last bet | 0.952 |
+| Logistic regression, 30 features | 0.952 |
 
 ## LightGBM models and the safer gambling guardrail
 
 `python -m pve.train_models`, results in `reports/model_metrics.json`. Same players and split as the baselines.
 
-**More complex isn't always better.** LightGBM churn scores 0.961 ROC-AUC against 0.958 for the one-line recency rule, and LightGBM value (0.54 rank correlation, 76% top-decile capture) is no better than BG/NBD (0.53, 76%).
+**More complex isn't always better.** LightGBM churn scores 0.957 ROC-AUC against 0.952 for the one-line recency rule, and LightGBM value (0.56 rank correlation, 79% top-decile capture) is no better than BG/NBD (0.55, 80%).
 
-**A feature-rich value model makes targeting more harmful.** LightGBM learns that harm signals (escalating stakes, chasing) predict future spend, so **17%** of its top 10% are players in harm, about twice the BG/NBD baseline (9%).
+**A feature-rich value model makes targeting more harmful.** LightGBM learns that harm signals (escalating stakes, chasing) predict future spend, so **16%** of its top 10% are players in harm, about twice the BG/NBD baseline (9%) and the overall rate (6.5%).
 
 **The guardrail policy** (`src/pve/guardrail.py`), based on retail safer gambling practice. Harm is always checked first:
 
@@ -111,18 +114,18 @@ Missing a harmed player is treated as worse than withholding an offer from a hea
 
 | Guardrail | Harmed players caught | Flags that are correct | VIPs flagged | Regulars flagged |
 |---|---|---|---|---|
-| Retail rules only (points score) | 78% | 59% | 3.3% | 4.1% |
-| **LightGBM + retail rules + past escalation** | **94%** | **96%** | 1.8% | 0% |
+| Retail rules only (points score) | 80% | 54% | 3.2% | 4.2% |
+| **LightGBM + retail rules + past escalation** | **87%** | **94%** | 1.2% | 0.1% |
 
-Every flag comes with plain-English reasons (e.g. *"Recent stakes are 25.8x their first month"*), so staff have concrete points for a customer conversation. SHAP shows the model's top drivers are the retail signals: stake vs first month (lifetime and recent), number of bets, recent stake and share of bets on unfamiliar markets.
+On the monthly snapshots used by the monitor, the guardrail catches **89–95%** of harmed players, so 87% on this test split is at the low end of its range. Every flag comes with plain-English reasons (e.g. *"Recent stakes are 25.8x their first month"*), so staff have concrete points for a customer conversation. SHAP shows the model's top drivers are the retail signals: lifetime stake vs first month, number of bets, recent stake, share of bets on unfamiliar markets and recent stake vs first month.
 
 **Who gets retention offers** (208 offers, 10% of test players):
 
-| Offers ranked by | Offers to harmed players | Offers reaching players who then churned | Value of those churners |
-|---|---|---|---|
-| Value, no guardrail | 35 (17%) | n/a | n/a |
-| Value, with guardrail | 1 (0.5%) | 1.4% | £18k |
-| **Value at risk, with guardrail** | 2 (1%) | **75%** | **£262k** |
+| Offers ranked by | Offers to harmed players | Offers reaching players who then churned |
+|---|---|---|
+| Value, no guardrail | 34 (16%) | n/a |
+| Value, with guardrail | 3 (1.4%) | 2% |
+| **Value at risk, with guardrail** | 3 (1.4%) | **76%** |
 
 A valuable player who will stay anyway doesn't need an offer, so eligible players are ranked by **value at risk = value if retained x chance of churning**.
 
@@ -132,13 +135,30 @@ A valuable player who will stay anyway doesn't need an offer, so eligible player
 
 | Campaign (208 offers) | Offers reaching would-be leavers | Value saved | Cost of offers | Net impact |
 |---|---|---|---|---|
-| Value, no guardrail | 8 | £17.0k | £2.1k | £14.9k |
-| Value + guardrail | 7 | £14.9k | £2.1k | £12.8k |
-| **Value at risk + guardrail** | **155** | **£52.4k** | £2.1k | **£50.3k** |
+| Value, no guardrail | 8 | £16.7k | £2.1k | £14.7k |
+| Value + guardrail | 9 | £15.8k | £2.1k | £13.7k |
+| **Value at risk + guardrail** | **158** | **£48.8k** | £2.1k | **£46.8k** |
 
-With no campaign, the 728 players who leave take **£561k** of 6-month value with them (15% of all player value). Under every combination tested (offers saving 10%, 20% or 30% of leavers, costing £5, £10 or £25), the guarded value-at-risk campaign nets between **£21k and £77k**. Without the guardrail, £2.1k of the "value saved" would have come from keeping players in harm betting; the guardrail gives that up on purpose.
+With no campaign, the 728 players who leave take **£426k** of 6-month value with them (12% of all player value). Under every combination tested (offers saving 10%, 20% or 30% of leavers, costing £5, £10 or £25), the guarded value-at-risk campaign nets between **£19k and £72k**. Without the guardrail, £2.1k of the "value saved" would have come from keeping players in harm betting; the guardrail gives that up on purpose.
 
-**Caveat:** harm is detected almost perfectly here because the data is synthetic and the harm labels are exact. Real labels from past interventions and self-exclusions are noisier and incomplete, so real-world performance would be lower and needs monitoring.
+## Drift monitoring
+
+`python -m pve.monitor`, results in `reports/monitoring.json`. The models are trained once, on 30 June 2025. Every month after that, the monitor re-scores current players with the same models and checks:
+
+1. **Have the players changed?** PSI (Population Stability Index) for each key feature: under 0.1 stable, 0.1–0.25 watch, over 0.25 alert.
+2. **Have the model's outputs changed?** PSI for the harm and churn scores, plus the share of players the guardrail flags.
+3. **Is the model still right?** Churn ROC-AUC, once 90 days have passed and the outcome is known.
+
+To test it, a "what-if" copy of the data adds two real-world events after training: **a new virtuals game** (October), which many players try for a few weeks, and **a winter football tournament** (20 Nov – 18 Dec), with extra football bets including from players who normally bet on racing. Healthy players try new things for a while, then go back to their usual market.
+
+| October (virtuals launch) | No events | With events |
+|---|---|---|
+| PSI, share of bets on unfamiliar markets | 0.08 | **1.97 (alert)** |
+| PSI, harm score | 0.08 | **1.18 (alert)** |
+| Healthy players flagged by retail rules alone | 4.7% | **57%** |
+| Healthy players flagged by the guardrail | 0.6% | **0.6%** |
+
+The monitor sounds the alarm, and the guardrail isn't fooled: it looks at each player's whole history rather than a few weeks of change. The churn model stays accurate (ROC-AUC 0.956–0.967) in every month where outcomes are known. Even without events, the monitor raises alerts from October: in the synthetic data no new players join after early September (a quirk of the generator, much like a real acquisition freeze), so the player base shrinks and ages and the share in harm rises from 6.7% to 10.4%. The monitor correctly reports that the players have changed, and the guardrail keeps catching 90–95% of harmed players.
 
 ## Scoring API
 
@@ -178,14 +198,13 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 pip install -e .
 
-python -m pve.generate_data        # synthetic data -> data/raw/
-python -m pve.build_features       # SQL features   -> data/features/
-python -m pve.train_baselines      # baselines      -> reports/baseline_metrics.json
-python -m pve.train_models         # LightGBM + guardrail -> reports/model_metrics.json, models/
-uvicorn pve.api:app_from_env --factory --reload   # API on http://127.0.0.1:8000/docs
+make pipeline                      # data -> SQL features -> baselines -> LightGBM + guardrail
+make monitor                       # monthly drift monitoring -> reports/monitoring.json
+make api                           # API on http://127.0.0.1:8000/docs
 python -m pytest -q                # tests (Spark tests skip without PySpark + Java)
-jupyter notebook notebooks/01_results.ipynb   # or open it in VS Code
 ```
+
+Then open `notebooks/01_results.ipynb` in VS Code or Jupyter.
 
 **With Docker** (includes Java and PySpark, builds the data and models inside the image):
 
@@ -197,19 +216,12 @@ docker run --rm player-value-engine python -m pytest -q
 
 **CI**: every push runs the full test suite, including Spark vs DuckDB parity, then builds the Docker image and checks the API answers (`.github/workflows/ci.yml`).
 
-## Roadmap
+## Limits
 
-- [x] Repo, environment, tests
-- [x] Synthetic bet-level data generator
-- [x] Harm markers based on retail safer gambling signals
-- [x] SQL feature layer (DuckDB, window functions)
-- [x] BG/NBD + Gamma-Gamma CLV baseline, churn baseline
-- [x] LightGBM value and churn models with SHAP
-- [x] Safer gambling guardrail on targeting
-- [x] PySpark feature pipeline with parity tests
-- [x] FastAPI scoring service, Docker, GitHub Actions CI
-- [x] Commercial impact and results notebook
-- [ ] Drift monitoring
+- **Synthetic data.** The harm patterns were designed from retail safer gambling practice, so the models find them easily. Real behaviour is messier.
+- **Perfect labels.** Here we know exactly who is in harm and when it started. Real labels come from past interventions and self-exclusions: incomplete, delayed and biased towards players who were already spotted. Real-world accuracy would be lower.
+- **Campaign assumptions.** The 20% save rate and £10 offer cost are guesses; a controlled test would measure them.
+- **Results vary by sample.** On different samples of players the guardrail catches 87–95% of harmed players; a single number hides that spread.
 
 ## Stack
 

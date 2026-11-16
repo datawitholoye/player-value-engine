@@ -5,7 +5,8 @@
 
 CREATE OR REPLACE TABLE player_features AS
 WITH params AS (
-    SELECT DATE '2025-06-30' AS snapshot_date
+    -- the snapshot date is set by the runner (build_features.py, default 30 June 2025)
+    SELECT getvariable('snapshot_date') AS snapshot_date
 ),
 daily AS (
     -- daily summary + bet patterns, cut off at the snapshot

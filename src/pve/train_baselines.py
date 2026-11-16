@@ -54,6 +54,7 @@ def load() -> pd.DataFrame:
         FROM '{FEATURES}/player_features.parquet' AS f
         JOIN '{FEATURES}/labels.parquet'          AS l USING (player_id)
         WHERE l.is_current_player
+        ORDER BY player_id          -- fixed order: same split and same models every run
     """).df()
     # hidden truth, used ONLY to measure harm exposure, never as a feature
     truth = duckdb.sql(f"SELECT player_id, _true_segment, _harm_onset_date FROM '{RAW}/players.parquet'").df()

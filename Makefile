@@ -1,4 +1,4 @@
-.PHONY: setup pipeline spark api test docker-build docker-run
+.PHONY: setup pipeline monitor spark api test docker-build docker-run
 
 setup:            ## install everything (add requirements-spark.txt on Python <= 3.13)
 	pip install -r requirements.txt
@@ -9,6 +9,9 @@ pipeline:         ## data -> features -> baselines -> models
 	python -m pve.build_features
 	python -m pve.train_baselines
 	python -m pve.train_models
+
+monitor:          ## monthly drift monitoring, normal world and event world
+	python -m pve.monitor
 
 spark:            ## the same features with PySpark (needs Java)
 	python -m pve.spark_features
