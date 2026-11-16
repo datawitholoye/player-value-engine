@@ -44,5 +44,8 @@ jobs:
           docker run -d -p 8000:8000 --name pve player-value-engine
           for i in $(seq 1 30); do curl -sf localhost:8000/health && break; sleep 2; done
           curl -sf localhost:8000/health
-          curl -sf localhost:8000/players/1
-          curl -sf "localhost:8000/offers?limit=3"
+          # look up a real player: the first one in the offer queue
+          PID=$(curl -sf "localhost:8000/offers?limit=1" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['player_id'])")
+          curl -sf localhost:8000/players/$PID
+          # a player who doesn't exist must get "404 not found"
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/players/0)" = "404"
